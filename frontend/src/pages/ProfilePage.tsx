@@ -28,7 +28,7 @@ export function ProfilePage() {
     resolver: zodResolver(detailsSchema),
     defaultValues: {
       displayName: user?.displayName ?? "",
-      email: "",
+      email: user?.email ?? "",
     },
   });
 
@@ -39,7 +39,7 @@ export function ProfilePage() {
 
   async function onSubmitDetails(values: DetailsValues) {
     try {
-      const updated = await updateProfile(values.displayName, values.email ?? "");
+      const updated = await updateProfile(values.displayName, user?.email ?? "");
       setUser(updated);
       toast.success("Profile updated");
     } catch {
@@ -102,7 +102,7 @@ export function ProfilePage() {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" {...field} />
+                    <Input type="email" {...field} value={user.email} disabled />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

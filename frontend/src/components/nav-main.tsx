@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router-dom"
 import { cn } from "@/lib/utils"
 import {
   SidebarGroup,
-  SidebarGroupLabel,
+  // SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -23,7 +23,7 @@ export function NavMain({
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Tickets</SidebarGroupLabel>
+      {/* <SidebarGroupLabel>Tickets</SidebarGroupLabel> */}
       <SidebarMenu>
         {items.map((item) => (
           <SidebarMenuItem key={item.title}>

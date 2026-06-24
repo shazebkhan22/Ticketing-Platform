@@ -6,6 +6,7 @@ interface SeedUser {
   password: string;
   role: "admin" | "employee";
   displayName: string;
+  email: string | null;
 }
 
 // IMPORTANT: replace every password below with a real one of your own choosing
@@ -15,12 +16,12 @@ interface SeedUser {
 // credentials later.
 const PLACEHOLDER_PASSWORD = "ChangeMe123!";
 const SEED_USERS: SeedUser[] = [
-  { username: "permanand", password: PLACEHOLDER_PASSWORD, role: "admin", displayName: "Permanand Pandey" },
-  { username: "jitesh", password: PLACEHOLDER_PASSWORD, role: "admin", displayName: "Jitesh Malhotra" },
-  { username: "helpdesk", password: PLACEHOLDER_PASSWORD, role: "admin", displayName: "Help Desk" },
-  { username: "pranesh", password: PLACEHOLDER_PASSWORD, role: "employee", displayName: "Pranesh Kute" },
-  { username: "raghvendra", password: PLACEHOLDER_PASSWORD, role: "employee", displayName: "Raghvendra Mishra" },
-  { username: "manoj", password: PLACEHOLDER_PASSWORD, role: "employee", displayName: "Manoj Mohite" },
+  { username: "parmanand", password: PLACEHOLDER_PASSWORD, role: "admin", displayName: "Parmanand Pandey", email: "parmanandp@cygnussolutions.co.in" },
+  { username: "jitesh", password: PLACEHOLDER_PASSWORD, role: "admin", displayName: "Jitesh Malhotra", email: "jiteshm@cygnussolutions.co.in" },
+  { username: "helpdesk", password: PLACEHOLDER_PASSWORD, role: "admin", displayName: "Help Desk", email: null },
+  { username: "pranesh", password: PLACEHOLDER_PASSWORD, role: "employee", displayName: "Pranesh Kute", email: "praneshk@cygnussolutions.co.in" },
+  { username: "raghvendra", password: PLACEHOLDER_PASSWORD, role: "employee", displayName: "Raghvendra Mishra", email: "raghvendram@cygnussolutions.co.in" },
+  { username: "manoj", password: PLACEHOLDER_PASSWORD, role: "employee", displayName: "Manoj Mohite", email: "manojm@cygnussolutions.co.in" },
 ];
 
 const CALL_TYPE_TARGETS: { call_type: string; days: number | null }[] = [
@@ -45,16 +46,16 @@ async function seed() {
       if (existing.rowCount === 0) {
         const hash = await bcrypt.hash(user.password, 12);
         await client.query(
-          `INSERT INTO users (username, password_hash, role, display_name) VALUES ($1, $2, $3, $4)`,
-          [user.username, hash, user.role, user.displayName]
+          `INSERT INTO users (username, password_hash, role, display_name, email) VALUES ($1, $2, $3, $4, $5)`,
+          [user.username, hash, user.role, user.displayName, user.email]
         );
         console.log(`User "${user.username}" (${user.role}) created.`);
       } else {
-        await client.query(`UPDATE users SET role = $1 WHERE username = $2 AND role != $1`, [
-          user.role,
-          user.username,
-        ]);
-        console.log(`User "${user.username}" already exists, role synced to "${user.role}".`);
+        await client.query(
+          `UPDATE users SET role = $1, email = $2 WHERE username = $3`,
+          [user.role, user.email, user.username]
+        );
+        console.log(`User "${user.username}" already exists, role/email synced.`);
       }
     }
 

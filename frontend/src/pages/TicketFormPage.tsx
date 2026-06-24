@@ -14,6 +14,7 @@ import type { TicketDetail, TicketFormInput } from "@/types/ticket";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Combobox } from "@/components/ui/combobox";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -301,7 +302,14 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Account Manager *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Person in the office who reported this issue" {...field} />
+                    <Combobox
+                      value={field.value}
+                      onChange={field.onChange}
+                      options={options.accountManagers.map((a) => ({ value: a, label: a }))}
+                      placeholder="Person in the office who handles the account"
+                      searchPlaceholder="Search or type a name..."
+                      allowCustomValue
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -315,7 +323,14 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Assigned By *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Person in the company who assigned this ticket" {...field} />
+                    <Combobox
+                      value={field.value}
+                      onChange={field.onChange}
+                      options={options.assignedBys.map((a) => ({ value: a, label: a }))}
+                      placeholder="Person in the company who assigned this ticket"
+                      searchPlaceholder="Search or type a name..."
+                      allowCustomValue
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -353,26 +368,19 @@ export function TicketFormPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Assigned To *</FormLabel>
-                  <Select
-                    value={field.value ? String(field.value) : ""}
-                    onValueChange={(v) => field.onChange(Number(v))}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select an employee">
-                          {options.assignedToOptions.find((emp) => emp.id === field.value)
-                            ?.displayName}
-                        </SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {options.assignedToOptions.map((emp) => (
-                        <SelectItem key={emp.id} value={String(emp.id)}>
-                          {emp.displayName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <Combobox
+                      value={field.value ? String(field.value) : ""}
+                      onChange={(v) => field.onChange(Number(v))}
+                      options={options.assignedToOptions.map((emp) => ({
+                        value: String(emp.id),
+                        label: emp.displayName,
+                      }))}
+                      placeholder="Select an employee"
+                      searchPlaceholder="Search employees..."
+                      emptyText="No employee found."
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

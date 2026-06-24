@@ -29,7 +29,7 @@ authRouter.post("/login", async (req, res) => {
   const { username, password } = parsed.data;
 
   const result = await pool.query(
-    "SELECT id, username, password_hash, role, display_name FROM users WHERE username = $1",
+    "SELECT id, username, password_hash, role, display_name, email FROM users WHERE username = $1",
     [username]
   );
   const user = result.rows[0];
@@ -46,12 +46,14 @@ authRouter.post("/login", async (req, res) => {
   req.session.username = user.username;
   req.session.role = user.role;
   req.session.displayName = user.display_name;
+  req.session.email = user.email;
 
   res.json({
     id: user.id,
     username: user.username,
     role: user.role,
     displayName: user.display_name,
+    email: user.email,
   });
 });
 
@@ -62,15 +64,24 @@ authRouter.post("/logout", (req, res) => {
   });
 });
 
-authRouter.get("/me", (req, res) => {
+authRouter.get("/me", async (req, res) => {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Not authenticated" });
   }
+  const result = await pool.query(
+    "SELECT id, username, role, display_name, email FROM users WHERE id = $1",
+    [req.session.userId]
+  );
+  const user = result.rows[0];
+  if (!user) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
   res.json({
-    id: req.session.userId,
-    username: req.session.username,
-    role: req.session.role,
-    displayName: req.session.displayName,
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    displayName: user.display_name,
+    email: user.email,
   });
 });
 
@@ -82,18 +93,20 @@ authRouter.patch("/profile", requireAuth, async (req, res) => {
   const { displayName, email } = parsed.data;
 
   const result = await pool.query(
-    "UPDATE users SET display_name = $1, email = $2 WHERE id = $3 RETURNING id, username, role, display_name",
+    "UPDATE users SET display_name = $1, email = $2 WHERE id = $3 RETURNING id, username, role, display_name, email",
     [displayName, email || null, req.session.userId]
   );
   const user = result.rows[0];
 
   req.session.displayName = user.display_name;
+  req.session.email = user.email;
 
   res.json({
     id: user.id,
     username: user.username,
     role: user.role,
     displayName: user.display_name,
+    email: user.email,
   });
 });
 

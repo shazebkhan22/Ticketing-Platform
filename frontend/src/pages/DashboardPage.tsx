@@ -72,7 +72,7 @@ export function DashboardPage() {
     return (value: string) => updateFilter(key, value === ALL_FILTER_VALUE ? undefined : value);
   }
 
-  const pageSize = filters.pageSize ?? 25;
+  const pageSize = filters.pageSize ?? 6;
   const page = filters.page ?? 1;
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
 

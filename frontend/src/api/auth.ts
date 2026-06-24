@@ -5,6 +5,7 @@ export interface AuthUser {
   username: string;
   role: "admin" | "employee";
   displayName?: string;
+  email?: string;
 }
 
 export async function login(username: string, password: string): Promise<AuthUser> {

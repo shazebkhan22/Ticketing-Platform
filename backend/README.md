@@ -35,7 +35,7 @@ This document is the single source of truth for the backend. Read it top to bott
 The backend is a REST API for the Cygnus Ticketing System — it replaces an Excel sheet used to track IT support tickets (warranty, AMC, installation, office issues, etc).
 
 It currently provides:
-- **Individual logins for 5 named accounts** (session-based, not JWT) — 1 admin + 4 employees (one of whom, Permanand Pandey, is both the admin and an active ticket-creating/resolving employee). See [§7](#7-authentication--sessions).
+- **Individual logins for 5 named accounts** (session-based, not JWT) — 1 admin + 4 employees (one of whom, Parmanand Pandey, is both the admin and an active ticket-creating/resolving employee). See [§7](#7-authentication--sessions).
 - **Ownership-based permissions**: every ticket is owned by the user who created it. The owner (or an admin) can edit/update/delete it; everyone else can only read it. Enforced server-side, not just hidden in the UI — see [§7](#7-authentication--sessions) and the `requireOwnerOrAdmin` middleware.
 - Full CRUD for tickets, including an auto-generated date-based ticket number.
 - An append-only "remarks" timeline per ticket (never edited, only appended).
@@ -159,7 +159,7 @@ Individual employee accounts — there is **no shared login**. Seeded once via `
 
 | username | display_name | role |
 |---|---|---|
-| `permanand` | Permanand Pandey | `admin` (also creates/gets assigned tickets like any employee) |
+| `parmanand` | Parmanand Pandey | `admin` (also creates/gets assigned tickets like any employee) |
 | `jitesh` | Jitesh Malhotra | `employee` |
 | `pranesh` | Pranesh Kute | `employee` |
 | `raghvendra` | Raghvendra Mishra | `employee` |
@@ -285,7 +285,7 @@ The matching TypeScript const arrays live in `src/types/ticket.ts` (`TICKET_MODE
 
 There are two layers to authorization, and it's important to understand both:
 
-1. **Role** (`admin` or `employee`) — stored on `users.role`. Only one account (`permanand`) is `admin`.
+1. **Role** (`admin` or `employee`) — stored on `users.role`. Only one account (`parmanand`) is `admin`.
 2. **Assignment** (`tickets.assigned_to_user_id`) — every ticket is currently assigned to exactly one employee, chosen at creation and re-assignable later. This is **independent of who created the ticket** (`owner_user_id`, informational only) — a ticket logged by one employee is commonly assigned to a different one to actually resolve it, and *that assignee* is who gets edit rights, not the creator.
 
 The actual rule, enforced server-side in `src/middleware/auth.ts`:
@@ -468,7 +468,7 @@ Returns every dropdown's valid values in one call — the frontend should call t
   "internalTags": ["Internal", "External"],
   "accountManagers": ["Reception Desk - Sunita", "..."],
   "assignedToOptions": [
-    { "id": 1, "displayName": "Permanand Pandey" },
+    { "id": 1, "displayName": "Parmanand Pandey" },
     { "id": 2, "displayName": "Jitesh Malhotra" },
     { "id": 3, "displayName": "Pranesh Kute" },
     { "id": 4, "displayName": "Raghvendra Mishra" },
