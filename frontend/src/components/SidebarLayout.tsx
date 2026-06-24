@@ -17,7 +17,7 @@ export function SidebarLayout() {
           <Separator orientation="vertical" className="mr-2 h-4" />
           <h1 className="text-sm font-semibold text-slate-700">Cygnus Ticketing System</h1>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4">
+        <div className="flex flex-1 flex-col gap-4 p-4 no-scrollbar overflow-y-auto">
           <Outlet />
         </div>
       </SidebarInset>

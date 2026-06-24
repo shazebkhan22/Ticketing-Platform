@@ -25,13 +25,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <NavLink to="/">
-                <div className="flex aspect-square size-10 items-center justify-center rounded-lg  text-sidebar-primary-foreground">
-                  <img src="/Cygnus_C.svg" className="size-10" />
+                {/* <div className="flex aspect-square size-10 items-center justify-center rounded-lg  text-sidebar-primary-foreground"> */}
+                <div className="flex mx-auto justify-center mt-2">
+                  <img src="/Cygnus Exp.png" className="w-full h-8" />
                 </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
+                {/* <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">CISPL</span>
                   <span className="truncate text-xs">Ticketing System</span>
-                </div>
+                </div> */}
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
