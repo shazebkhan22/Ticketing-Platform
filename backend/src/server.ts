@@ -10,6 +10,14 @@ import { metaRouter } from "./routes/meta";
 
 const app = express();
 
+// Required behind a reverse proxy (Nginx) so Express reads the
+// X-Forwarded-Proto header to know the original request was HTTPS —
+// otherwise the session cookie's `secure` flag would never be satisfied
+// and logins would silently fail to persist in production.
+if (env.nodeEnv === "production") {
+  app.set("trust proxy", 1);
+}
+
 app.use(
   cors({
     origin: env.frontendOrigin,
