@@ -1,5 +1,21 @@
 import { Request, Response, NextFunction } from "express";
+import { z } from "zod";
 import { pool } from "../db/pool";
+
+const srNoParamSchema = z.coerce.number().int().positive();
+
+/**
+ * Rejects requests where :srNo isn't a positive integer before any
+ * controller touches the database — otherwise parseInt("abc") => NaN
+ * silently runs as a no-match query instead of a clear 400.
+ */
+export function validateSrNoParam(req: Request, res: Response, next: NextFunction) {
+  const parsed = srNoParamSchema.safeParse(req.params.srNo);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid ticket reference" });
+  }
+  next();
+}
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {

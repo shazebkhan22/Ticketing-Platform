@@ -18,6 +18,9 @@ const TicketDetailPage = lazy(() =>
 const TicketFormPage = lazy(() =>
   import("@/pages/TicketFormPage").then((m) => ({ default: m.TicketFormPage }))
 );
+const ProfilePage = lazy(() =>
+  import("@/pages/ProfilePage").then((m) => ({ default: m.ProfilePage }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,6 +55,7 @@ function App() {
                   <Route path="/tickets/new" element={<TicketFormPage />} />
                   <Route path="/tickets/:srNo" element={<TicketDetailPage />} />
                   <Route path="/tickets/:srNo/edit" element={<TicketFormPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
                 </Route>
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />

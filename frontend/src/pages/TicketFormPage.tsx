@@ -2,8 +2,8 @@ import { useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { toast } from "sonner";
+import { ticketFormSchema, type TicketFormValues } from "@/lib/schemas";
 import {
   useCreateTicket,
   useMetaOptions,
@@ -13,6 +13,7 @@ import {
 import type { TicketDetail, TicketFormInput } from "@/types/ticket";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -30,30 +31,10 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const ticketFormSchema = z.object({
-  ticketDate: z.string().min(1, "Required"),
-  mode: z.string().min(1, "Required"),
-  companyName: z.string().min(1, "Required"),
-  contactName: z.string().optional(),
-  contactNo: z.string().optional(),
-  emailId: z.string().optional(),
-  address: z.string().optional(),
-  model: z.string().optional(),
-  serialNumber: z.string().optional(),
-  problem: z.string().min(1, "Required"),
-  accountManager: z.string().min(1, "Required"),
-  assignedBy: z.string().min(1, "Required"),
-  callType: z.string().min(1, "Required"),
-  assignedToUserId: z.number().int().positive("Select an employee"),
-  deadlineDate: z.string().optional(),
-  internalTag: z.string().optional(),
-});
-
-type TicketFormValues = z.infer<typeof ticketFormSchema>;
+import { todayLocalDate } from "@/lib/ticket-utils";
 
 const EMPTY_FORM: TicketFormValues = {
-  ticketDate: new Date().toISOString().slice(0, 10),
+  ticketDate: todayLocalDate(),
   mode: "Call",
   companyName: "",
   contactName: "",
@@ -169,7 +150,7 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Date Received *</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <DatePicker value={field.value} onChange={field.onChange} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -404,7 +385,7 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Deadline Date</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <DatePicker value={field.value} onChange={field.onChange} placeholder="No deadline" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

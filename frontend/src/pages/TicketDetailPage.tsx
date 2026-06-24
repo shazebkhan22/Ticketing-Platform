@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import {
+  ticketFeedbackSchema as feedbackSchema,
+  ticketRemarkSchema as remarkSchema,
+} from "@/lib/schemas";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useAddRemark,
@@ -53,7 +57,9 @@ export function TicketDetailPage() {
   const addRemarkMutation = useAddRemark(ticketSrNo);
 
   const [newRemark, setNewRemark] = useState("");
+  const [remarkError, setRemarkError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
   if (isLoading || !data) {
     return (
@@ -71,8 +77,13 @@ export function TicketDetailPage() {
   const canEdit = user?.role === "admin" || user?.id === ticket.assignedToUserId;
 
   async function handleAddRemark() {
-    if (!newRemark.trim()) return;
-    await addRemarkMutation.mutateAsync(newRemark.trim());
+    const parsed = remarkSchema.safeParse(newRemark);
+    if (!parsed.success) {
+      setRemarkError(parsed.error.issues[0].message);
+      return;
+    }
+    setRemarkError(null);
+    await addRemarkMutation.mutateAsync(parsed.data);
     setNewRemark("");
     toast.success("Remark added");
   }
@@ -83,7 +94,13 @@ export function TicketDetailPage() {
   }
 
   async function handleFeedbackSave() {
-    await updateFeedback.mutateAsync(feedbackValue);
+    const parsed = feedbackSchema.safeParse(feedbackValue);
+    if (!parsed.success) {
+      setFeedbackError(parsed.error.issues[0].message);
+      return;
+    }
+    setFeedbackError(null);
+    await updateFeedback.mutateAsync(parsed.data);
     toast.success("Feedback saved");
   }
 
@@ -202,20 +219,27 @@ export function TicketDetailPage() {
           <CardContent>
             <h3 className="mb-3 text-sm font-bold text-cygnus-700">Feedback From User</h3>
             {canEdit ? (
-              <div className="no-print flex gap-2">
-                <Input
-                  value={feedbackValue}
-                  onChange={(e) => setFeedback(e.target.value)}
-                  placeholder="e.g. 5/5"
-                  className="max-w-xs"
-                />
-                <Button
-                  variant="outline"
-                  onClick={handleFeedbackSave}
-                  disabled={updateFeedback.isPending}
-                >
-                  Save
-                </Button>
+              <div className="no-print">
+                <div className="flex gap-2">
+                  <Input
+                    value={feedbackValue}
+                    onChange={(e) => {
+                      setFeedback(e.target.value);
+                      setFeedbackError(null);
+                    }}
+                    placeholder="e.g. 5/5"
+                    className="max-w-xs"
+                    aria-invalid={Boolean(feedbackError)}
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={handleFeedbackSave}
+                    disabled={updateFeedback.isPending}
+                  >
+                    Save
+                  </Button>
+                </div>
+                {feedbackError && <p className="mt-1 text-xs text-destructive">{feedbackError}</p>}
               </div>
             ) : (
               <p className="text-sm text-slate-800">{feedbackValue || "-"}</p>
@@ -249,10 +273,15 @@ export function TicketDetailPage() {
               </label>
               <Textarea
                 value={newRemark}
-                onChange={(e) => setNewRemark(e.target.value)}
+                onChange={(e) => {
+                  setNewRemark(e.target.value);
+                  setRemarkError(null);
+                }}
                 rows={3}
                 placeholder="Describe the update..."
+                aria-invalid={Boolean(remarkError)}
               />
+              {remarkError && <p className="mt-1 text-xs text-destructive">{remarkError}</p>}
               <Button
                 disabled={addRemarkMutation.isPending || !newRemark.trim()}
                 onClick={handleAddRemark}

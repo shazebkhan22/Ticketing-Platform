@@ -20,3 +20,15 @@ export async function fetchMe(): Promise<AuthUser> {
   const { data } = await apiClient.get<AuthUser>("/auth/me");
   return data;
 }
+
+export async function updateProfile(displayName: string, email: string): Promise<AuthUser> {
+  const { data } = await apiClient.patch<AuthUser>("/auth/profile", { displayName, email });
+  return data;
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<void> {
+  await apiClient.patch("/auth/password", { currentPassword, newPassword });
+}

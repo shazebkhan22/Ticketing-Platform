@@ -15,6 +15,7 @@ export function NavMain({
     title: string
     url: string
     icon: React.ReactNode
+    cta?: boolean
   }[]
 }) {
   const location = useLocation()
@@ -26,11 +27,19 @@ export function NavMain({
       <SidebarMenu>
         {items.map((item) => (
           <SidebarMenuItem key={item.title}>
-            <SidebarMenuButton asChild tooltip={item.title} isActive={currentPath === item.url}>
+            <SidebarMenuButton
+              asChild
+              tooltip={item.title}
+              isActive={currentPath === item.url}
+              className={cn(
+                item.cta &&
+                  "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
+              )}
+            >
               <NavLink
                 to={item.url}
                 className={({ isActive }) =>
-                  cn(isActive && currentPath === item.url && "bg-sidebar-accent")
+                  cn(isActive && currentPath === item.url && !item.cta && "bg-sidebar-accent")
                 }
               >
                 {item.icon}

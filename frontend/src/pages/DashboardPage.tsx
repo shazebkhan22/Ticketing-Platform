@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate, truncateChars } from "@/lib/ticket-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
@@ -205,10 +206,10 @@ export function DashboardPage() {
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-500">From</label>
-            <Input
-              type="date"
-              value={filters.dateFrom ?? ""}
-              onChange={(e) => updateFilter("dateFrom", e.target.value)}
+            <DatePicker
+              value={filters.dateFrom}
+              onChange={(value) => updateFilter("dateFrom", value)}
+              placeholder="Any date"
             />
           </div>
           <div className="flex items-end">
