@@ -35,6 +35,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -71,8 +81,11 @@ export function DashboardPage() {
   const importMutation = useImportTickets();
   const templateMutation = useDownloadImportTemplate();
   const importInputRef = useRef<HTMLInputElement>(null);
+  const [exportConfirmOpen, setExportConfirmOpen] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
 
   async function handleExport() {
+    setExportConfirmOpen(false);
     try {
       await exportMutation.mutateAsync(effectiveFilters);
     } catch {
@@ -88,9 +101,16 @@ export function DashboardPage() {
     }
   }
 
-  async function handleImportFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleImportFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
+    if (!file) return;
+    setPendingImportFile(file);
+  }
+
+  async function handleConfirmImport() {
+    const file = pendingImportFile;
+    setPendingImportFile(null);
     if (!file) return;
     try {
       const result = await importMutation.mutateAsync(file);
@@ -122,7 +142,7 @@ export function DashboardPage() {
     return (value: string) => updateFilter(key, value === ALL_FILTER_VALUE ? undefined : value);
   }
 
-  const pageSize = filters.pageSize ?? 5;
+  const pageSize = filters.pageSize ?? 6;
   const page = filters.page ?? 1;
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
 
@@ -131,7 +151,11 @@ export function DashboardPage() {
       <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-bold text-slate-800">Dashboard</h2>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleExport} disabled={exportMutation.isPending}>
+          <Button
+            variant="outline"
+            onClick={() => setExportConfirmOpen(true)}
+            disabled={exportMutation.isPending}
+          >
             {exportMutation.isPending ? "Exporting..." : "Export"}
           </Button>
           {isAdmin && (
@@ -163,6 +187,44 @@ export function DashboardPage() {
         </div>
       </div>
 
+      <AlertDialog open={exportConfirmOpen} onOpenChange={setExportConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Export tickets to Excel?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will download an .xlsx file of every ticket matching your current filters
+              (not just the current page).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleExport}>Export</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendingImportFile !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingImportFile(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Import tickets from "{pendingImportFile?.name}" ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will create a new ticket for every valid row in the file. Rows that fail
+              validation will be skipped and reported — this cannot be undone in bulk, so make
+              sure this is the right file.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmImport}>Import</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
         {SUMMARY_CARDS.map((card) => (
           <Card key={card.key} className={cn(card.color)}>
@@ -178,7 +240,7 @@ export function DashboardPage() {
         ))}
       </div>
 
-      <Card className="mb-4">
+      <Card className="mb-2">
         <CardContent className="flex flex-wrap gap-3">
           <div className="min-w-40">
             <label className="mb-1 block text-xs font-semibold text-slate-500">Search</label>
