@@ -1,5 +1,6 @@
 import { apiClient } from "./client";
 import type {
+  ImportResult,
   MetaOptions,
   Summary,
   Ticket,
@@ -8,6 +9,42 @@ import type {
   TicketFormInput,
   TicketListResponse,
 } from "@/types/ticket";
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+export async function exportTickets(filters: TicketFilters): Promise<void> {
+  const params: Record<string, string> = {};
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== "" && key !== "page" && key !== "pageSize") {
+      params[key] = String(value);
+    }
+  });
+  const { data } = await apiClient.get("/tickets/export", { params, responseType: "blob" });
+  triggerDownload(data, `tickets-export-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+export async function downloadImportTemplate(): Promise<void> {
+  const { data } = await apiClient.get("/tickets/import-template", { responseType: "blob" });
+  triggerDownload(data, "ticket-import-template.xlsx");
+}
+
+export async function importTickets(file: File): Promise<ImportResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await apiClient.post<ImportResult>("/tickets/import", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
 
 export async function fetchSummary(): Promise<Summary> {
   const { data } = await apiClient.get<Summary>("/tickets/summary");

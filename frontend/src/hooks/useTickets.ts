@@ -3,10 +3,13 @@ import {
   addRemark,
   createTicket,
   deleteTicket,
+  downloadImportTemplate,
+  exportTickets,
   fetchMetaOptions,
   fetchSummary,
   fetchTicket,
   fetchTickets,
+  importTickets,
   updateTicket,
   updateTicketFeedback,
   updateTicketStatus,
@@ -103,5 +106,27 @@ export function useAddRemark(srNo: number) {
   return useMutation({
     mutationFn: (body: string) => addRemark(srNo, body),
     onSuccess: invalidate,
+  });
+}
+
+export function useExportTickets() {
+  return useMutation({
+    mutationFn: (filters: TicketFilters) => exportTickets(filters),
+  });
+}
+
+export function useDownloadImportTemplate() {
+  return useMutation({
+    mutationFn: () => downloadImportTemplate(),
+  });
+}
+
+export function useImportTickets() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => importTickets(file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ticketKeys.all });
+    },
   });
 }

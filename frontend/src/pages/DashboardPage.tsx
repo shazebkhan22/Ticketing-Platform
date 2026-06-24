@@ -1,7 +1,15 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import { useMetaOptions, useSummary, useTicketList } from "@/hooks/useTickets";
+import {
+  useDownloadImportTemplate,
+  useExportTickets,
+  useImportTickets,
+  useMetaOptions,
+  useSummary,
+  useTicketList,
+} from "@/hooks/useTickets";
 import type { TicketFilters } from "@/types/ticket";
 import { SUMMARY_CARDS, ALL_FILTER_VALUE, DEFAULT_TICKET_FILTERS } from "@/constants/dashboard";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -58,6 +66,48 @@ export function DashboardPage() {
   const tickets = ticketsResponse?.tickets ?? [];
   const total = ticketsResponse?.total ?? 0;
 
+  const isAdmin = user?.role === "admin";
+  const exportMutation = useExportTickets();
+  const importMutation = useImportTickets();
+  const templateMutation = useDownloadImportTemplate();
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleExport() {
+    try {
+      await exportMutation.mutateAsync(effectiveFilters);
+    } catch {
+      toast.error("Failed to export tickets");
+    }
+  }
+
+  async function handleDownloadTemplate() {
+    try {
+      await templateMutation.mutateAsync();
+    } catch {
+      toast.error("Failed to download template");
+    }
+  }
+
+  async function handleImportFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const result = await importMutation.mutateAsync(file);
+      if (result.failedCount === 0) {
+        toast.success(`Imported ${result.created} ticket(s)`);
+      } else if (result.created === 0) {
+        toast.error(`Import failed for all ${result.failedCount} row(s). First error: ${result.errors[0]?.error}`);
+      } else {
+        toast.warning(
+          `Imported ${result.created} ticket(s), ${result.failedCount} row(s) failed. First error (row ${result.errors[0]?.row}): ${result.errors[0]?.error}`
+        );
+      }
+    } catch {
+      toast.error("Failed to import file");
+    }
+  }
+
   function updateFilter<K extends keyof TicketFilters>(key: K, value: TicketFilters[K]) {
     setFilters((prev) => ({
       ...prev,
@@ -72,15 +122,45 @@ export function DashboardPage() {
     return (value: string) => updateFilter(key, value === ALL_FILTER_VALUE ? undefined : value);
   }
 
-  const pageSize = filters.pageSize ?? 6;
+  const pageSize = filters.pageSize ?? 5;
   const page = filters.page ?? 1;
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
+      <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-bold text-slate-800">Dashboard</h2>
-        <Button variant="default" onClick={() => navigate("/tickets/new")}>+ New Ticket</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleExport} disabled={exportMutation.isPending}>
+            {exportMutation.isPending ? "Exporting..." : "Export"}
+          </Button>
+          {isAdmin && (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleDownloadTemplate}
+                disabled={templateMutation.isPending}
+              >
+                Download Template
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => importInputRef.current?.click()}
+                disabled={importMutation.isPending}
+              >
+                {importMutation.isPending ? "Importing..." : "Import"}
+              </Button>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".xlsx"
+                className="hidden"
+                onChange={handleImportFileSelected}
+              />
+            </>
+          )}
+          <Button variant="default" onClick={() => navigate("/tickets/new")}>+ New Ticket</Button>
+        </div>
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">

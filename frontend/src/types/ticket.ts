@@ -98,6 +98,18 @@ export interface TicketFilters {
   pageSize?: number;
 }
 
+export interface ImportRowError {
+  row: number;
+  success: false;
+  error: string;
+}
+
+export interface ImportResult {
+  created: number;
+  failedCount: number;
+  errors: ImportRowError[];
+}
+
 export interface TicketFormInput {
   ticketDate: string;
   mode: TicketMode;

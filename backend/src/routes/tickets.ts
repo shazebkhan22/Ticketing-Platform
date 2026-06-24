@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { requireAuth, requireAssigneeOrAdmin, validateSrNoParam } from "../middleware/auth";
+import multer from "multer";
+import { requireAuth, requireAdmin, requireAssigneeOrAdmin, validateSrNoParam } from "../middleware/auth";
 import {
   listTickets,
   getSummary,
@@ -11,6 +12,12 @@ import {
   deleteTicket,
   addRemark,
 } from "../controllers/tickets";
+import { exportTickets, downloadImportTemplate, importTickets } from "../controllers/excel";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 export const ticketsRouter = Router();
 
@@ -18,6 +25,15 @@ ticketsRouter.use(requireAuth);
 
 // Read routes: any authenticated user (admin or employee) can see all tickets.
 ticketsRouter.get("/summary", getSummary);
+
+// Excel export/import — declared before "/:srNo" so they aren't swallowed by
+// that wildcard param route. Export honors the same filters as the list
+// endpoint; import is restricted to admins since it bulk-creates many rows
+// at once on behalf of whoever uploads the file.
+ticketsRouter.get("/export", exportTickets);
+ticketsRouter.get("/import-template", downloadImportTemplate);
+ticketsRouter.post("/import", requireAdmin, upload.single("file"), importTickets);
+
 ticketsRouter.get("/", listTickets);
 ticketsRouter.get("/:srNo", validateSrNoParam, getTicket);
 
