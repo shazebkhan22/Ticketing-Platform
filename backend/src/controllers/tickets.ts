@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { pool } from "../db/pool";
 import { generateTicketNumber } from "../utils/ticketNumber";
+import { logActivity } from "../utils/activityLog";
 import {
   TICKET_MODES,
   CALL_TYPES,
@@ -256,7 +257,17 @@ export async function createTicket(req: Request, res: Response) {
     ]
   );
 
-  res.status(201).json(rowToTicket(result.rows[0]));
+  const ticket = result.rows[0];
+
+  await logActivity({
+    actorUserId: req.session.userId,
+    actorName: req.session.username ?? "Unknown",
+    action: "Created ticket",
+    ticketSrNo: ticket.sr_no,
+    ticketNo: ticket.ticket_no,
+  });
+
+  res.status(201).json(rowToTicket(ticket));
 }
 
 export async function updateTicket(req: Request, res: Response) {
@@ -323,7 +334,22 @@ export async function updateTicket(req: Request, res: Response) {
     return res.status(404).json({ error: "Ticket not found" });
   }
 
-  res.json(rowToTicket(result.rows[0]));
+  const ticket = result.rows[0];
+  const changedFields = Object.keys(d);
+  if (d.assignedToUserId !== undefined) {
+    changedFields.push("assignedTo");
+  }
+
+  await logActivity({
+    actorUserId: req.session.userId,
+    actorName: req.session.username ?? "Unknown",
+    action: "Updated ticket",
+    ticketSrNo: ticket.sr_no,
+    ticketNo: ticket.ticket_no,
+    details: `Changes in ticket`,
+  });
+
+  res.json(rowToTicket(ticket));
 }
 
 export async function updateTicketStatus(req: Request, res: Response) {
@@ -343,7 +369,18 @@ export async function updateTicketStatus(req: Request, res: Response) {
     return res.status(404).json({ error: "Ticket not found" });
   }
 
-  res.json(rowToTicket(result.rows[0]));
+  const ticket = result.rows[0];
+
+  await logActivity({
+    actorUserId: req.session.userId,
+    actorName: req.session.username ?? "Unknown",
+    action: "Changed status",
+    ticketSrNo: ticket.sr_no,
+    ticketNo: ticket.ticket_no,
+    details: `New status: ${parsed.data.status}`,
+  });
+
+  res.json(rowToTicket(ticket));
 }
 
 const feedbackSchema = z.object({
@@ -366,15 +403,37 @@ export async function updateFeedback(req: Request, res: Response) {
     `UPDATE tickets SET feedback = $1 WHERE sr_no = $2 RETURNING *`,
     [parsed.data.feedback, srNo]
   );
-  res.json(rowToTicket(result.rows[0]));
+  const ticket = result.rows[0];
+
+  await logActivity({
+    actorUserId: req.session.userId,
+    actorName: req.session.username ?? "Unknown",
+    action: "Added feedback",
+    ticketSrNo: ticket.sr_no,
+    ticketNo: ticket.ticket_no,
+    details: parsed.data.feedback,
+  });
+
+  res.json(rowToTicket(ticket));
 }
 
 export async function deleteTicket(req: Request, res: Response) {
   const srNo = parseInt(req.params.srNo, 10);
-  const result = await pool.query("DELETE FROM tickets WHERE sr_no = $1 RETURNING sr_no", [srNo]);
+  const result = await pool.query("DELETE FROM tickets WHERE sr_no = $1 RETURNING sr_no, ticket_no", [
+    srNo,
+  ]);
   if (result.rows.length === 0) {
     return res.status(404).json({ error: "Ticket not found" });
   }
+
+  await logActivity({
+    actorUserId: req.session.userId,
+    actorName: req.session.username ?? "Unknown",
+    action: "Deleted ticket",
+    ticketSrNo: null,
+    ticketNo: result.rows[0].ticket_no,
+  });
+
   res.json({ success: true });
 }
 
@@ -385,7 +444,7 @@ export async function addRemark(req: Request, res: Response) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
-  const ticketExists = await pool.query("SELECT 1 FROM tickets WHERE sr_no = $1", [srNo]);
+  const ticketExists = await pool.query("SELECT ticket_no FROM tickets WHERE sr_no = $1", [srNo]);
   if (ticketExists.rows.length === 0) {
     return res.status(404).json({ error: "Ticket not found" });
   }
@@ -397,6 +456,15 @@ export async function addRemark(req: Request, res: Response) {
     `INSERT INTO remarks (ticket_sr_no, remark_date, body, created_by) VALUES ($1, $2, $3, $4) RETURNING *`,
     [srNo, remarkDate, parsed.data.body, createdBy]
   );
+
+  await logActivity({
+    actorUserId: req.session.userId,
+    actorName: req.session.username ?? "Unknown",
+    action: "Added remark",
+    ticketSrNo: srNo,
+    ticketNo: ticketExists.rows[0].ticket_no,
+    details: parsed.data.body,
+  });
 
   res.status(201).json({
     id: result.rows[0].id,

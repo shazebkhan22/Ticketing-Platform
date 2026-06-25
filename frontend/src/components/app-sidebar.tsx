@@ -6,7 +6,8 @@ import { NavLink } from "react-router-dom"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
-import { NAV_MAIN, NAV_SECONDARY } from "@/constants/navigation"
+import { NAV_MAIN, NAV_ADMIN, NAV_SECONDARY } from "@/constants/navigation"
+import { useAuth } from "@/hooks/useAuth"
 import {
   Sidebar,
   SidebarContent,
@@ -18,6 +19,9 @@ import {
 } from "@/components/ui/sidebar"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user } = useAuth()
+  const navMainItems = user?.role === "admin" ? [...NAV_MAIN, ...NAV_ADMIN] : NAV_MAIN
+
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -39,7 +43,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={NAV_MAIN} />
+        <NavMain items={navMainItems} />
         <NavSecondary items={NAV_SECONDARY} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

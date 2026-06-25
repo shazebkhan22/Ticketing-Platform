@@ -71,6 +71,21 @@ CREATE TABLE call_type_targets (
   target_resolution_days INTEGER
 );
 
+CREATE TABLE activity_log (
+  id SERIAL PRIMARY KEY,
+  actor_user_id INTEGER REFERENCES users(id),
+  actor_name TEXT NOT NULL,
+  action TEXT NOT NULL,
+  ticket_sr_no INTEGER REFERENCES tickets(sr_no) ON DELETE SET NULL,
+  ticket_no TEXT,
+  details TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_activity_log_created_at ON activity_log(created_at);
+CREATE INDEX idx_activity_log_ticket_sr_no ON activity_log(ticket_sr_no);
+CREATE INDEX idx_activity_log_actor_user_id ON activity_log(actor_user_id);
+
 CREATE TABLE smtp_config (
   id SMALLINT PRIMARY KEY DEFAULT 1,
   host TEXT,

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/AdminRoute";
 import { SidebarLayout } from "@/components/SidebarLayout";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,6 +21,9 @@ const TicketFormPage = lazy(() =>
 );
 const ProfilePage = lazy(() =>
   import("@/pages/ProfilePage").then((m) => ({ default: m.ProfilePage }))
+);
+const ActivityLogPage = lazy(() =>
+  import("@/pages/ActivityLogPage").then((m) => ({ default: m.ActivityLogPage }))
 );
 
 const queryClient = new QueryClient({
@@ -56,6 +60,9 @@ function App() {
                   <Route path="/tickets/:srNo" element={<TicketDetailPage />} />
                   <Route path="/tickets/:srNo/edit" element={<TicketFormPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
+                  <Route element={<AdminRoute />}>
+                    <Route path="/activity" element={<ActivityLogPage />} />
+                  </Route>
                 </Route>
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -157,7 +157,7 @@ export function TicketDetailPage() {
       <Card className="mb-6">
         <CardContent>
           <h3 className="mb-3 text-sm font-bold text-cygnus-700">Ticket Details</h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <Field label="Date Received" value={formatDate(ticket.ticketDate)} />
             <Field label="Mode" value={ticket.mode} />
             <Field label="Company Name" value={ticket.companyName} />
@@ -180,7 +180,7 @@ export function TicketDetailPage() {
       <Card className="mb-6">
         <CardContent>
           <h3 className="mb-3 text-sm font-bold text-cygnus-700">Assignment Details</h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <Field label="Account Manager" value={ticket.accountManager} />
             <Field label="Assigned By" value={ticket.assignedBy} />
             <Field label="Call Type" value={ticket.callType} />

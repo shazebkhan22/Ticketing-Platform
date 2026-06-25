@@ -7,6 +7,7 @@ import { pool } from "./db/pool";
 import { authRouter } from "./routes/auth";
 import { ticketsRouter } from "./routes/tickets";
 import { metaRouter } from "./routes/meta";
+import { activityRouter } from "./routes/activity";
 
 const app = express();
 
@@ -49,6 +50,7 @@ app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
 app.use("/api/auth", authRouter);
 app.use("/api/tickets", ticketsRouter);
 app.use("/api/meta", metaRouter);
+app.use("/api/activity", activityRouter);
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
