@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -413,7 +414,14 @@ export function DashboardPage() {
                 <TableCell>{t.assignedBy}</TableCell>
                 <TableCell>{t.assignedTo}</TableCell>
                 <TableCell>
-                  <StatusBadge ticket={t} />
+                  <div className="flex items-center gap-1">
+                    <StatusBadge ticket={t} />
+                    {t.slaBreached && (
+                      <Badge variant="secondary" className="rounded-full bg-rose-100 text-rose-800">
+                        SLA
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-slate-500">{formatDate(t.updatedAt)}</TableCell>
               </TableRow>

@@ -8,7 +8,6 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import {
   useAddRemark,
-  useDeleteTicket,
   useTicketDetail,
   useUpdateTicketFeedback,
   useUpdateTicketStatus,
@@ -21,19 +20,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-
 
 function Field({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -53,7 +41,6 @@ export function TicketDetailPage() {
   const { data, isLoading } = useTicketDetail(ticketSrNo);
   const updateStatus = useUpdateTicketStatus(ticketSrNo);
   const updateFeedback = useUpdateTicketFeedback(ticketSrNo);
-  const deleteTicketMutation = useDeleteTicket();
   const addRemarkMutation = useAddRemark(ticketSrNo);
 
   const [newRemark, setNewRemark] = useState("");
@@ -104,12 +91,6 @@ export function TicketDetailPage() {
     toast.success("Feedback saved");
   }
 
-  async function handleDelete() {
-    await deleteTicketMutation.mutateAsync(ticket.srNo);
-    toast.success(`Ticket ${ticket.ticketNo} deleted`);
-    navigate("/");
-  }
-
   return (
     <div>
       <div className="no-print mb-6 flex items-center justify-between">
@@ -129,27 +110,6 @@ export function TicketDetailPage() {
           </Button>
           {canEdit && (
             <Button onClick={() => navigate(`/tickets/${ticket.srNo}/edit`)}>Edit</Button>
-          )}
-          {canEdit && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive">Delete</Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete ticket {ticket.ticketNo}?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This cannot be undone. All remarks on this ticket will also be deleted.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction variant="destructive" onClick={handleDelete}>
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
           )}
         </div>
       </div>
@@ -185,10 +145,19 @@ export function TicketDetailPage() {
             <Field label="Assigned By" value={ticket.assignedBy} />
             <Field label="Call Type" value={ticket.callType} />
             <Field label="Assigned To" value={ticket.assignedTo} />
-            <Field
-              label="Deadline"
-              value={ticket.deadlineDate ? formatDate(ticket.deadlineDate) : null}
-            />
+            <div>
+              <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                Deadline
+              </div>
+              <div className="mt-0.5 flex items-center gap-2 text-sm text-slate-800">
+                {ticket.deadlineDate ? formatDate(ticket.deadlineDate) : "-"}
+                {ticket.slaBreached && (
+                  <Badge variant="secondary" className="rounded-full bg-rose-100 text-rose-800">
+                    SLA Breached
+                  </Badge>
+                )}
+              </div>
+            </div>
             <Field label="Created" value={formatDateTime(ticket.createdAt)} />
             <Field label="Last Updated" value={formatDateTime(ticket.updatedAt)} />
           </div>

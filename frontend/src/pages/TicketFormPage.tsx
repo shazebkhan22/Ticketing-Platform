@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { ticketFormSchema, type TicketFormValues } from "@/lib/schemas";
@@ -106,6 +106,13 @@ export function TicketFormPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketDetail]);
 
+  // Leaving Deadline Date blank isn't really "no deadline" — the backend
+  // fills it in from this call type's SLA target (ticketDate + target days)
+  // if one is configured, so surface that target here rather than letting
+  // the field look optional when it usually isn't.
+  const selectedCallType = useWatch({ control: form.control, name: "callType" });
+  const slaTargetDays = options?.slaTargets?.[selectedCallType];
+
   async function onSubmit(values: TicketFormValues) {
     try {
       if (isEdit) {
@@ -202,7 +209,7 @@ export function TicketFormPage() {
               name="contactName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contact Name</FormLabel>
+                  <FormLabel>Contact Name *</FormLabel>
                   <FormControl>
                     <Input {...field} />
                   </FormControl>
@@ -216,7 +223,7 @@ export function TicketFormPage() {
               name="contactNo"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contact No</FormLabel>
+                  <FormLabel>Contact No *</FormLabel>
                   <FormControl>
                     <Input {...field} />
                   </FormControl>
@@ -230,7 +237,7 @@ export function TicketFormPage() {
               name="emailId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email ID</FormLabel>
+                  <FormLabel>Email ID *</FormLabel>
                   <FormControl>
                     <Input type="email" {...field} />
                   </FormControl>
@@ -244,7 +251,7 @@ export function TicketFormPage() {
               name="address"
               render={({ field }) => (
                 <FormItem className="md:col-span-2">
-                  <FormLabel>Address</FormLabel>
+                  <FormLabel>Address *</FormLabel>
                   <FormControl>
                     <Textarea rows={2} {...field} />
                   </FormControl>
@@ -393,8 +400,22 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Deadline Date</FormLabel>
                   <FormControl>
-                    <DatePicker value={field.value} onChange={field.onChange} placeholder="No deadline" />
+                    <DatePicker
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder={
+                        slaTargetDays != null
+                          ? `Defaults to ${slaTargetDays} day SLA`
+                          : "No deadline"
+                      }
+                    />
                   </FormControl>
+                  {!field.value && slaTargetDays != null && (
+                    <p className="text-xs text-slate-500">
+                      Left blank, this will default to {slaTargetDays} day
+                      {slaTargetDays === 1 ? "" : "s"} from the date received ({selectedCallType} SLA).
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

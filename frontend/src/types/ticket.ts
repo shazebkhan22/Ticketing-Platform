@@ -17,6 +17,7 @@ export interface Ticket {
   ticketNo: string;
   ticketDate: string;
   mode: TicketMode;
+  customerId: number | null;
   companyName: string;
   contactName: string | null;
   contactNo: string | null;
@@ -39,6 +40,7 @@ export interface Ticket {
   updatedAt: string;
   closedAt: string | null;
   lastRemark?: string;
+  slaBreached: boolean;
 }
 
 export interface Remark {
@@ -60,6 +62,7 @@ export interface Summary {
   closed: number;
   inProgress: number;
   overdue: number;
+  breached: number;
 }
 
 export interface Employee {
@@ -75,6 +78,7 @@ export interface MetaOptions {
   accountManagers: string[];
   assignedBys: string[];
   assignedToOptions: Employee[];
+  slaTargets: Record<string, number | null>;
 }
 
 export interface TicketListResponse {
@@ -94,6 +98,7 @@ export interface TicketFilters {
   dateTo?: string;
   search?: string;
   overdue?: string;
+  breached?: string;
   page?: number;
   pageSize?: number;
 }

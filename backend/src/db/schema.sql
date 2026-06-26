@@ -18,11 +18,27 @@ CREATE TABLE users (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- One row per distinct company a ticket has ever been logged for — created
+-- automatically (see controllers/tickets.ts/excel.ts) whenever a ticket is
+-- saved with a company name not seen before. This is what makes "customer
+-- history" (all tickets for a company across time) possible without
+-- changing how tickets are entered.
+CREATE TABLE customers (
+  id SERIAL PRIMARY KEY,
+  name TEXT UNIQUE NOT NULL,
+  contact_name TEXT,
+  contact_no TEXT,
+  email_id TEXT,
+  address TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE tickets (
   sr_no SERIAL PRIMARY KEY,
   ticket_no TEXT UNIQUE NOT NULL,
   ticket_date DATE NOT NULL,
   mode ticket_mode NOT NULL,
+  customer_id INTEGER REFERENCES customers(id),
   company_name TEXT NOT NULL,
   contact_name TEXT,
   contact_no TEXT,
@@ -45,6 +61,8 @@ CREATE TABLE tickets (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   closed_at TIMESTAMPTZ
 );
+
+CREATE INDEX idx_tickets_customer_id ON tickets(customer_id);
 
 CREATE INDEX idx_tickets_status ON tickets(status);
 CREATE INDEX idx_tickets_call_type ON tickets(call_type);

@@ -20,6 +20,28 @@ const ADDITIVE_MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_activity_log_ticket_sr_no ON activity_log(ticket_sr_no)`,
   `CREATE INDEX IF NOT EXISTS idx_activity_log_actor_user_id ON activity_log(actor_user_id)`,
+  `CREATE TABLE IF NOT EXISTS customers (
+    id SERIAL PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    contact_name TEXT,
+    contact_no TEXT,
+    email_id TEXT,
+    address TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS customer_id INTEGER REFERENCES customers(id)`,
+  `CREATE INDEX IF NOT EXISTS idx_tickets_customer_id ON tickets(customer_id)`,
+  // Backfill: one customer row per distinct existing company name, then
+  // link every ticket to it. Safe to re-run — ON CONFLICT/WHERE NULL guards
+  // make both statements no-ops once already applied.
+  `INSERT INTO customers (name, contact_name, contact_no, email_id, address)
+   SELECT DISTINCT ON (company_name) company_name, contact_name, contact_no, email_id, address
+   FROM tickets
+   ORDER BY company_name, created_at DESC
+   ON CONFLICT (name) DO NOTHING`,
+  `UPDATE tickets SET customer_id = customers.id
+   FROM customers
+   WHERE tickets.customer_id IS NULL AND tickets.company_name = customers.name`,
 ];
 
 async function migrate() {

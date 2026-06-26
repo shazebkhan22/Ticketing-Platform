@@ -29,6 +29,16 @@ metaRouter.get("/options", async (_req, res) => {
     "SELECT DISTINCT assigned_by FROM tickets WHERE assigned_by IS NOT NULL ORDER BY assigned_by"
   );
 
+  // Per-call-type SLA targets (days to resolve) — used by the ticket form to
+  // auto-suggest a deadline once a call type is picked.
+  const slaTargetsResult = await pool.query(
+    "SELECT call_type, target_resolution_days FROM call_type_targets"
+  );
+  const slaTargets: Record<string, number | null> = {};
+  for (const row of slaTargetsResult.rows) {
+    slaTargets[row.call_type] = row.target_resolution_days;
+  }
+
   res.json({
     modes: TICKET_MODES,
     callTypes: CALL_TYPES,
@@ -40,5 +50,6 @@ metaRouter.get("/options", async (_req, res) => {
       id: r.id,
       displayName: r.display_name,
     })),
+    slaTargets,
   });
 });

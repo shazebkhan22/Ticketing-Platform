@@ -25,6 +25,12 @@ const ProfilePage = lazy(() =>
 const ActivityLogPage = lazy(() =>
   import("@/pages/ActivityLogPage").then((m) => ({ default: m.ActivityLogPage }))
 );
+const CustomersPage = lazy(() =>
+  import("@/pages/CustomersPage").then((m) => ({ default: m.CustomersPage }))
+);
+const CustomerDetailPage = lazy(() =>
+  import("@/pages/CustomerDetailPage").then((m) => ({ default: m.CustomerDetailPage }))
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -62,6 +68,8 @@ function App() {
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route element={<AdminRoute />}>
                     <Route path="/activity" element={<ActivityLogPage />} />
+                    <Route path="/customers" element={<CustomersPage />} />
+                    <Route path="/customers/:id" element={<CustomerDetailPage />} />
                   </Route>
                 </Route>
               </Route>

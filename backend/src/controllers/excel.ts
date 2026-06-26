@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import { z } from "zod";
 import { pool } from "../db/pool";
 import { generateTicketNumber } from "../utils/ticketNumber";
+import { getOrCreateCustomerId } from "../utils/customers";
 import {
   TICKET_MODES,
   CALL_TYPES,
@@ -352,16 +353,24 @@ export async function importTickets(req: Request, res: Response) {
     try {
       const ticketDate = new Date(d.ticketDate);
       const ticketNo = await generateTicketNumber(ticketDate);
+      const customerId = await getOrCreateCustomerId({
+        companyName: d.companyName,
+        contactName: d.contactName,
+        contactNo: d.contactNo,
+        emailId: d.emailId,
+        address: d.address,
+      });
       await pool.query(
         `INSERT INTO tickets (
-          ticket_no, ticket_date, mode, company_name, contact_name, contact_no, email_id, address,
+          ticket_no, ticket_date, mode, customer_id, company_name, contact_name, contact_no, email_id, address,
           model, serial_number, problem, owner_user_id, account_manager, assigned_by, call_type,
           assigned_to_user_id, assigned_to, deadline_date, status, feedback, internal_tag
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
         [
           ticketNo,
           d.ticketDate,
           d.mode,
+          customerId,
           d.companyName,
           d.contactName ?? null,
           d.contactNo ?? null,
