@@ -88,7 +88,7 @@ export function ProfilePage() {
                 <FormItem>
                   <FormLabel>Display Name</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input capitalize {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

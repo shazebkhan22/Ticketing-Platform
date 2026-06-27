@@ -143,7 +143,7 @@ export function DashboardPage() {
     return (value: string) => updateFilter(key, value === ALL_FILTER_VALUE ? undefined : value);
   }
 
-  const pageSize = filters.pageSize ?? 6;
+  const pageSize = filters.pageSize ?? 7;
   const page = filters.page ?? 1;
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
 
@@ -226,7 +226,7 @@ export function DashboardPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
         {SUMMARY_CARDS.map((card) => (
           <Card key={card.key} className={cn(card.color)}>
             <CardContent>
@@ -241,7 +241,7 @@ export function DashboardPage() {
         ))}
       </div>
 
-      <Card className="mb-2">
+      <Card className="mb-4">
         <CardContent className="flex flex-wrap gap-3">
           <div className="min-w-40">
             <label className="mb-1 block text-xs font-semibold text-slate-500">Search</label>

@@ -241,6 +241,7 @@ export function TicketDetailPage() {
                 Add Update
               </label>
               <Textarea
+                capitalize
                 value={newRemark}
                 onChange={(e) => {
                   setNewRemark(e.target.value);

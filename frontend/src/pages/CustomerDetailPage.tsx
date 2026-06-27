@@ -72,7 +72,7 @@ export function CustomerDetailPage() {
                 tickets.map((t) => (
                   <TableRow key={t.srNo}>
                     <TableCell className="text-sm font-medium">
-                      <Link to={`/tickets/${t.srNo}`} className="text-blue-600 hover:underline">
+                      <Link to={`/tickets/${t.srNo}`} className="text-blue-800 hover:underline">
                         {t.ticketNo}
                       </Link>
                     </TableCell>

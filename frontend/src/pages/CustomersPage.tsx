@@ -67,7 +67,7 @@ export function CustomersPage() {
                 customers.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="text-sm font-medium">
-                      <Link to={`/customers/${c.id}`} className="text-blue-600 hover:underline">
+                      <Link to={`/customers/${c.id}`} className="text-blue-800 hover:underline">
                         {c.name}
                       </Link>
                     </TableCell>
@@ -82,7 +82,7 @@ export function CustomersPage() {
                           {c.openTicketCount} open
                         </Badge>
                       ) : (
-                        <span className="text-slate-400">0</span>
+                        <span className="text-slate-400">None</span>
                       )}
                     </TableCell>
                     <TableCell className="text-sm text-slate-500">

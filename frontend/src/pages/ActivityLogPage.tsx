@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import type { ActivityFilters } from "@/types/activity";
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 
 export function ActivityLogPage() {
   const [page, setPage] = useState(1);

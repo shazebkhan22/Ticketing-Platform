@@ -197,7 +197,7 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Company Name *</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input capitalize {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -211,7 +211,7 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Contact Name *</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input capitalize {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -253,7 +253,7 @@ export function TicketFormPage() {
                 <FormItem className="md:col-span-2">
                   <FormLabel>Address *</FormLabel>
                   <FormControl>
-                    <Textarea rows={2} {...field} />
+                    <Textarea rows={2} capitalize {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -267,7 +267,7 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Model</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input capitalize {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -295,7 +295,7 @@ export function TicketFormPage() {
                 <FormItem className="md:col-span-2">
                   <FormLabel>Problem *</FormLabel>
                   <FormControl>
-                    <Textarea rows={3} {...field} />
+                    <Textarea rows={3} capitalize {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

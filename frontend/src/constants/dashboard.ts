@@ -12,4 +12,4 @@ export const SUMMARY_CARDS: { key: keyof Summary; label: string; color: string }
 // doesn't allow an empty-string item value, so we use this instead.
 export const ALL_FILTER_VALUE = "__all__";
 
-export const DEFAULT_TICKET_FILTERS: TicketFilters = { page: 1, pageSize: 6 };
+export const DEFAULT_TICKET_FILTERS: TicketFilters = { page: 1, pageSize: 7 };
