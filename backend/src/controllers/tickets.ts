@@ -242,6 +242,12 @@ export async function createTicket(req: Request, res: Response) {
   // permission basis — that's assigned_to_user_id, resolved below.
   const ownerUserId = req.session.userId;
 
+  // Employees may only assign tickets to themselves; admins can assign to
+  // anyone (including themselves or another admin).
+  if (req.session.role !== "admin" && d.assignedToUserId !== req.session.userId) {
+    return res.status(403).json({ error: "You can only assign tickets to yourself" });
+  }
+
   const assigneeResult = await pool.query("SELECT display_name FROM users WHERE id = $1", [
     d.assignedToUserId,
   ]);
@@ -365,6 +371,11 @@ export async function updateTicket(req: Request, res: Response) {
   // Reassigning a ticket updates both the FK and the denormalized display
   // name together, so they never drift apart.
   if (d.assignedToUserId !== undefined) {
+    // Employees may only reassign tickets to themselves; admins can assign
+    // to anyone (including themselves or another admin).
+    if (req.session.role !== "admin" && d.assignedToUserId !== req.session.userId) {
+      return res.status(403).json({ error: "You can only assign tickets to yourself" });
+    }
     const assigneeResult = await pool.query("SELECT display_name FROM users WHERE id = $1", [
       d.assignedToUserId,
     ]);

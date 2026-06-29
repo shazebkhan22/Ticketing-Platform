@@ -29,8 +29,8 @@ export function ActivityLogPage() {
   return (
     <div className=" space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-slate-800">Activity Log</h2>
-        <p className="text-sm text-slate-500">
+        <h2 className="text-lg font-semibold text-neutral-800">Activity Log</h2>
+        <p className="text-sm text-neutral-500">
           A chronological list of all actions performed in the system.
         </p>
       </div>
@@ -58,14 +58,14 @@ export function ActivityLogPage() {
                 ))
               ) : entries.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-sm text-slate-500">
+                  <TableCell colSpan={5} className="text-center text-sm text-neutral-500">
                     No activity recorded yet.
                   </TableCell>
                 </TableRow>
               ) : (
                 entries.map((entry) => (
                   <TableRow key={entry.id}>
-                    <TableCell className="whitespace-nowrap text-sm text-slate-500">
+                    <TableCell className="whitespace-nowrap text-sm text-neutral-500">
                       {formatDateTime(entry.createdAt)}
                     </TableCell>
                     <TableCell className="text-sm font-medium">{entry.actorName}</TableCell>
@@ -82,7 +82,7 @@ export function ActivityLogPage() {
                         entry.ticketNo ?? "—"
                       )}
                     </TableCell>
-                    <TableCell className="max-w-md truncate text-sm text-slate-500">
+                    <TableCell className="max-w-md truncate text-sm text-neutral-500">
                       {entry.details ?? "—"}
                     </TableCell>
                   </TableRow>
@@ -93,7 +93,7 @@ export function ActivityLogPage() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between text-sm text-slate-500">
+      <div className="flex items-center justify-between text-sm text-neutral-500">
         <span>
           Page {page} of {totalPages} ({total} entries)
         </span>

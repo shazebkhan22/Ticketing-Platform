@@ -5,6 +5,7 @@ import {
   PlusCircleIcon,
   HistoryIcon,
   BuildingIcon,
+  // ChartNoAxesCombined
 } from "lucide-react";
 
 export const NAV_MAIN = [
@@ -18,6 +19,7 @@ export const NAV_MAIN = [
 export const NAV_ADMIN = [
   { title: "Activity Log", url: "/activity", icon: <HistoryIcon /> },
   { title: "Customers", url: "/customers", icon: <BuildingIcon /> },
+  // { title: "Analytics", url: "/analytics", icon: <ChartNoAxesCombined /> },
 ];
 
 export const NAV_SECONDARY = [

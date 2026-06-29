@@ -30,7 +30,7 @@ export function CustomerDetailPage() {
   }
 
   if (!data) {
-    return <p className="text-sm text-slate-500">Customer not found.</p>;
+    return <p className="text-sm text-neutral-500">Customer not found.</p>;
   }
 
   const { customer, tickets } = data;
@@ -38,13 +38,13 @@ export function CustomerDetailPage() {
   return (
     <div className=" space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-slate-800">{customer.name}</h2>
-        <p className="text-sm text-slate-500">
+        <h2 className="text-lg font-semibold text-neutral-800">{customer.name}</h2>
+        <p className="text-sm text-neutral-500">
           {customer.contactName ?? "No contact name"}
           {customer.contactNo ? ` · ${customer.contactNo}` : ""}
           {customer.emailId ? ` · ${customer.emailId}` : ""}
         </p>
-        {customer.address && <p className="text-sm text-slate-500">{customer.address}</p>}
+        {customer.address && <p className="text-sm text-neutral-500">{customer.address}</p>}
       </div>
 
       <Card>
@@ -64,7 +64,7 @@ export function CustomerDetailPage() {
             <TableBody>
               {tickets.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-slate-500">
+                  <TableCell colSpan={7} className="text-center text-sm text-neutral-500">
                     No tickets logged for this customer yet.
                   </TableCell>
                 </TableRow>
@@ -76,16 +76,16 @@ export function CustomerDetailPage() {
                         {t.ticketNo}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-sm text-slate-500">{formatDate(t.ticketDate)}</TableCell>
+                    <TableCell className="text-sm text-neutral-500">{formatDate(t.ticketDate)}</TableCell>
                     <TableCell className="text-sm">{t.callType}</TableCell>
                     <TableCell className="text-sm">
                       <Badge variant="secondary" className={cn("rounded-full", STATUS_CLASSES[t.status])}>
                         {t.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="max-w-xs truncate text-sm text-slate-500">{t.problem}</TableCell>
+                    <TableCell className="max-w-xs truncate text-sm text-neutral-500">{t.problem}</TableCell>
                     <TableCell className="text-sm">{t.assignedTo}</TableCell>
-                    <TableCell className="text-sm text-slate-500">
+                    <TableCell className="text-sm text-neutral-500">
                       {t.deadlineDate ? formatDate(t.deadlineDate) : "—"}
                     </TableCell>
                   </TableRow>

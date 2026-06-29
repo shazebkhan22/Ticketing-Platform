@@ -65,10 +65,10 @@ export function ProfilePage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <h2 className="text-xl font-bold text-slate-800">Profile</h2>
+      <h2 className="text-xl font-bold text-neutral-800">Profile</h2>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-6">
-        <h3 className="mb-8 text-md font-semibold text-slate-700">Account Details</h3>
+      <div className="rounded-lg border border-neutral-200 bg-white p-6">
+        <h3 className="mb-8 text-md font-semibold text-neutral-700">Account Details</h3>
         <Form {...detailsForm}>
           <form
             onSubmit={detailsForm.handleSubmit(onSubmitDetails)}
@@ -116,8 +116,8 @@ export function ProfilePage() {
         </Form>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-6">
-        <h3 className="mb-8 text-md font-semibold text-slate-700">Change Password</h3>
+      <div className="rounded-lg border border-neutral-200 bg-white p-6">
+        <h3 className="mb-8 text-md font-semibold text-neutral-700">Change Password</h3>
         <Form {...passwordForm}>
           <form
             onSubmit={passwordForm.handleSubmit(onSubmitPassword)}

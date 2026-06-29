@@ -150,7 +150,7 @@ export function DashboardPage() {
   return (
     <div>
       <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-bold text-slate-800">Dashboard</h2>
+        <h2 className="text-xl font-bold text-neutral-800">Dashboard</h2>
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
@@ -242,17 +242,17 @@ export function DashboardPage() {
       </div>
 
       <Card className="mb-4">
-        <CardContent className="flex flex-wrap gap-3">
-          <div className="min-w-40">
-            <label className="mb-1 block text-xs font-semibold text-slate-500">Search</label>
+        <CardContent className="flex flex-wrap gap-2">
+          <div className="min-w-44 flex-1">
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">Search</label>
             <Input
               placeholder="Company or ticket no."
               value={filters.search ?? ""}
               onChange={(e) => updateFilter("search", e.target.value)}
             />
           </div>
-          <div className="min-w-24">
-            <label className="mb-1 block text-xs font-semibold text-slate-500">Status</label>
+          <div className="min-w-24 flex-1">
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">Status</label>
             <Select value={filters.status ?? ALL_FILTER_VALUE} onValueChange={updateSelectFilter("status")}>
               <SelectTrigger className="w-full">
                 <SelectValue />
@@ -267,8 +267,8 @@ export function DashboardPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-24">
-            <label className="mb-1 block text-xs font-semibold text-slate-500">Call Type</label>
+          <div className="min-w-24 flex-1">
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">Call Type</label>
             <Select
               value={filters.callType ?? ALL_FILTER_VALUE}
               onValueChange={updateSelectFilter("callType")}
@@ -286,8 +286,8 @@ export function DashboardPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-32">
-            <label className="mb-1 block text-xs font-semibold text-slate-500">
+          <div className="min-w-32 flex-1">
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">
               Account Manager
             </label>
             <Select
@@ -307,8 +307,8 @@ export function DashboardPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-24">
-            <label className="mb-1 block text-xs font-semibold text-slate-500">Assigned To</label>
+          <div className="min-w-24 flex-1">
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">Assigned To</label>
             <Select
               value={filters.assignedTo ?? ALL_FILTER_VALUE}
               onValueChange={updateSelectFilter("assignedTo")}
@@ -326,8 +326,8 @@ export function DashboardPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-32">
-            <label className="mb-1 block text-xs font-semibold text-slate-500">
+          <div className="min-w-32 flex-1">
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">
               Assigned By
             </label>
             <Select
@@ -347,15 +347,15 @@ export function DashboardPage() {
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500">From</label>
+          <div className="min-w-32 flex-1">
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">From</label>
             <DatePicker
               value={filters.dateFrom}
               onChange={(value) => updateFilter("dateFrom", value)}
               placeholder="Any date"
             />
           </div>
-          <div className="flex items-end">
+          <div className="flex flex-1 items-end">
             <Button
               variant="default"
               size="lg"
@@ -389,14 +389,14 @@ export function DashboardPage() {
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={7} className="py-6 text-center text-slate-400">
+                <TableCell colSpan={7} className="py-6 text-center text-neutral-400">
                   Loading...
                 </TableCell>
               </TableRow>
             )}
             {!isLoading && tickets.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="py-6 text-center text-slate-400">
+                <TableCell colSpan={7} className="py-6 text-center text-neutral-400">
                   No tickets found.
                 </TableCell>
               </TableRow>
@@ -423,14 +423,14 @@ export function DashboardPage() {
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="text-slate-500">{formatDate(t.updatedAt)}</TableCell>
+                <TableCell className="text-neutral-500">{formatDate(t.updatedAt)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Card>
 
-      <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
+      <div className="mt-4 flex items-center justify-between text-sm text-neutral-500">
         <span>
           Showing {tickets.length} of {total} tickets
         </span>

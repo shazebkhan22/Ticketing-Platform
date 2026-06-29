@@ -23,8 +23,8 @@ export function CustomersPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-slate-800">Customers</h2>
-        <p className="text-sm text-slate-500">
+        <h2 className="text-lg font-semibold text-neutral-800">Customers</h2>
+        <p className="text-sm text-neutral-500">
           Every company tickets have been logged for, with their full service history.
         </p>
       </div>
@@ -59,7 +59,7 @@ export function CustomersPage() {
                 ))
               ) : customers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-sm text-slate-500">
+                  <TableCell colSpan={5} className="text-center text-sm text-neutral-500">
                     No customers found.
                   </TableCell>
                 </TableRow>
@@ -71,7 +71,7 @@ export function CustomersPage() {
                         {c.name}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-sm text-slate-500">
+                    <TableCell className="text-sm text-neutral-500">
                       {c.contactName ?? "—"}
                       {c.contactNo ? ` · ${c.contactNo}` : ""}
                     </TableCell>
@@ -82,10 +82,10 @@ export function CustomersPage() {
                           {c.openTicketCount} open
                         </Badge>
                       ) : (
-                        <span className="text-slate-400">None</span>
+                        <span className="text-neutral-400">None</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-slate-500">
+                    <TableCell className="text-sm text-neutral-500">
                       {c.lastTicketDate ? formatDate(c.lastTicketDate) : "—"}
                     </TableCell>
                   </TableRow>

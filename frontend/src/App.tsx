@@ -8,6 +8,7 @@ import { SidebarLayout } from "@/components/SidebarLayout";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
+// import { AnalyticsPage } from "./pages/AnalyticsPage";
 
 const LoginPage = lazy(() => import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage })));
 const DashboardPage = lazy(() =>
@@ -70,6 +71,7 @@ function App() {
                     <Route path="/activity" element={<ActivityLogPage />} />
                     <Route path="/customers" element={<CustomersPage />} />
                     <Route path="/customers/:id" element={<CustomerDetailPage />} />
+                    {/* <Route path="/analytics" element={<AnalyticsPage />} /> */}
                   </Route>
                 </Route>
               </Route>

@@ -26,8 +26,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 function Field({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
-      <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{label}</div>
-      <div className="mt-0.5 text-sm text-slate-800">{value || "-"}</div>
+      <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">{label}</div>
+      <div className="mt-0.5 text-sm text-neutral-800">{value || "-"}</div>
     </div>
   );
 }
@@ -100,7 +100,7 @@ export function TicketDetailPage() {
           >
             ← Back to dashboard
           </Button>
-          <h2 className="mt-3 text-xl font-bold text-slate-800 flex items-center gap-2">
+          <h2 className="mt-3 text-xl font-bold text-neutral-800 flex items-center gap-2">
             Ticket: {ticket.ticketNo} <StatusBadge ticket={ticket} />
           </h2>
         </div>
@@ -146,10 +146,10 @@ export function TicketDetailPage() {
             <Field label="Call Type" value={ticket.callType} />
             <Field label="Assigned To" value={ticket.assignedTo} />
             <div>
-              <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+              <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
                 Deadline
               </div>
-              <div className="mt-0.5 flex items-center gap-2 text-sm text-slate-800">
+              <div className="mt-0.5 flex items-center gap-2 text-sm text-neutral-800">
                 {ticket.deadlineDate ? formatDate(ticket.deadlineDate) : "-"}
                 {ticket.slaBreached && (
                   <Badge variant="secondary" className="rounded-full bg-rose-100 text-rose-800">
@@ -164,7 +164,7 @@ export function TicketDetailPage() {
 
           {canEdit && (
             <div className="no-print mt-4 flex items-center gap-2">
-              <span className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+              <span className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
                 Change Status:
               </span>
               {STATUS_FLOW.map((s, idx) => (
@@ -211,7 +211,7 @@ export function TicketDetailPage() {
                 {feedbackError && <p className="mt-1 text-xs text-destructive">{feedbackError}</p>}
               </div>
             ) : (
-              <p className="text-sm text-slate-800">{feedbackValue || "-"}</p>
+              <p className="text-sm text-neutral-800">{feedbackValue || "-"}</p>
             )}
           </CardContent>
         </Card>
@@ -221,23 +221,23 @@ export function TicketDetailPage() {
         <CardContent>
           <h3 className="mb-3 text-sm font-bold text-cygnus-700">Remarks Timeline</h3>
           <div className="flex flex-col gap-3">
-            {remarks.length === 0 && <p className="text-sm text-slate-400">No remarks yet.</p>}
+            {remarks.length === 0 && <p className="text-sm text-neutral-400">No remarks yet.</p>}
             {remarks.map((r) => (
               <div
                 key={r.id}
-                className="rounded-r-md border-l-3 border-cygnus-600 bg-slate-50 px-3.5 py-2"
+                className="rounded-r-md border-l-3 border-cygnus-600 bg-neutral-50 px-3.5 py-2"
               >
-                <div className="mb-1 text-xs text-slate-500">
+                <div className="mb-1 text-xs text-neutral-500">
                   {formatDateTimeWithSeconds(r.createdAt)} {r.createdBy && `· ${r.createdBy}`}
                 </div>
-                <div className="text-sm text-slate-800">{r.body}</div>
+                <div className="text-sm text-neutral-800">{r.body}</div>
               </div>
             ))}
           </div>
 
           {canEdit && (
-            <div className="no-print mt-4 border-t border-slate-200 pt-4">
-              <label className="mb-1 block text-xs font-semibold text-slate-500">
+            <div className="no-print mt-4 border-t border-neutral-200 pt-4">
+              <label className="mb-1 block text-xs font-semibold text-neutral-500">
                 Add Update
               </label>
               <Textarea

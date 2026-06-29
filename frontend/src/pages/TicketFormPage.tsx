@@ -4,6 +4,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { ticketFormSchema, type TicketFormValues } from "@/lib/schemas";
+import { useAuth } from "@/hooks/useAuth";
 import {
   useCreateTicket,
   useMetaOptions,
@@ -79,11 +80,21 @@ export function TicketFormPage() {
   const isEdit = Boolean(srNo);
   const ticketSrNo = Number(srNo);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const { data: options, isLoading: optionsLoading } = useMetaOptions();
   const { data: ticketDetail, isLoading: ticketLoading } = useTicketDetail(ticketSrNo);
   const createTicketMutation = useCreateTicket();
   const updateTicketMutation = useUpdateTicket(ticketSrNo);
+
+  // Employees can only ever assign to themselves (enforced again on the
+  // backend) — a new ticket should default to that instead of an empty
+  // picker, since there's nothing else for them to choose.
+  const emptyFormForUser = useMemo(
+    () => (!isAdmin && user ? { ...EMPTY_FORM, assignedToUserId: user.id } : EMPTY_FORM),
+    [isAdmin, user]
+  );
 
   // Computed once we actually render the form (the loading gate below
   // guarantees ticketDetail is already loaded by then), so Select fields
@@ -91,8 +102,8 @@ export function TicketFormPage() {
   // being updated afterwards — Radix's Select trigger does not reliably
   // reflect a controlled `value` change that happens after initial mount.
   const defaultValues = useMemo(
-    () => (ticketDetail ? ticketToFormValues(ticketDetail.ticket) : EMPTY_FORM),
-    [ticketDetail]
+    () => (ticketDetail ? ticketToFormValues(ticketDetail.ticket) : emptyFormForUser),
+    [ticketDetail, emptyFormForUser]
   );
 
   const form = useForm<TicketFormValues>({
@@ -142,13 +153,13 @@ export function TicketFormPage() {
 
   return (
     <div className="">
-      <h2 className="mb-2 text-xl font-bold text-slate-800">
+      <h2 className="mb-2 text-xl font-bold text-neutral-800">
         {isEdit ? "Edit Ticket" : "New Ticket"}
       </h2>
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="rounded-lg border border-slate-200 bg-white p-6"
+          className="rounded-lg border border-neutral-200 bg-white p-6"
         >
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormField
@@ -379,7 +390,11 @@ export function TicketFormPage() {
                     <Combobox
                       value={field.value ? String(field.value) : ""}
                       onChange={(v) => field.onChange(Number(v))}
-                      options={options.assignedToOptions.map((emp) => ({
+                      disabled={!isAdmin}
+                      options={(isAdmin
+                        ? options.assignedToOptions
+                        : options.assignedToOptions.filter((emp) => emp.id === user?.id)
+                      ).map((emp) => ({
                         value: String(emp.id),
                         label: emp.displayName,
                       }))}
@@ -411,7 +426,7 @@ export function TicketFormPage() {
                     />
                   </FormControl>
                   {!field.value && slaTargetDays != null && (
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-neutral-500">
                       Left blank, this will default to {slaTargetDays} day
                       {slaTargetDays === 1 ? "" : "s"} from the date received ({selectedCallType} SLA).
                     </p>
