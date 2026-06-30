@@ -7,6 +7,7 @@ CREATE TYPE ticket_mode AS ENUM ('Whatsapp', 'Call', 'Mail', 'Verbally');
 CREATE TYPE call_type AS ENUM ('Warranty', 'AMC', 'OEM', 'Office', 'Installation', 'Project', 'Call', 'Chargeable', 'Non-Chargeable');
 CREATE TYPE ticket_status AS ENUM ('Pending', 'In Progress', 'Closed');
 CREATE TYPE internal_tag AS ENUM ('Internal', 'External');
+CREATE TYPE ticket_priority AS ENUM ('P1', 'P2', 'P3', 'P4');
 
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
@@ -53,6 +54,10 @@ CREATE TABLE tickets (
   call_type call_type NOT NULL,
   assigned_to_user_id INTEGER NOT NULL REFERENCES users(id),
   assigned_to TEXT NOT NULL,
+  priority ticket_priority NOT NULL DEFAULT 'P3',
+  -- Manually set target/due date for resolving this ticket — plain field,
+  -- no automatic calculation or breach tracking (that was the old SLA
+  -- feature, removed; may be reintroduced later as its own thing).
   deadline_date DATE,
   status ticket_status NOT NULL DEFAULT 'Pending',
   feedback TEXT,
@@ -65,6 +70,7 @@ CREATE TABLE tickets (
 CREATE INDEX idx_tickets_customer_id ON tickets(customer_id);
 
 CREATE INDEX idx_tickets_status ON tickets(status);
+CREATE INDEX idx_tickets_priority ON tickets(priority);
 CREATE INDEX idx_tickets_call_type ON tickets(call_type);
 CREATE INDEX idx_tickets_assigned_to ON tickets(assigned_to);
 CREATE INDEX idx_tickets_assigned_to_user_id ON tickets(assigned_to_user_id);
@@ -83,11 +89,6 @@ CREATE TABLE remarks (
 );
 
 CREATE INDEX idx_remarks_ticket_sr_no ON remarks(ticket_sr_no);
-
-CREATE TABLE call_type_targets (
-  call_type call_type PRIMARY KEY,
-  target_resolution_days INTEGER
-);
 
 CREATE TABLE activity_log (
   id SERIAL PRIMARY KEY,

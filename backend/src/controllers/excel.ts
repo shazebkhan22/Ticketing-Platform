@@ -9,6 +9,7 @@ import {
   CALL_TYPES,
   TICKET_STATUSES,
   INTERNAL_TAGS,
+  TICKET_PRIORITIES,
 } from "../types/ticket";
 
 // Column headers used by both the export and the import template — keep
@@ -30,11 +31,18 @@ const COLUMNS = [
   { header: "Assigned By", key: "assignedBy", width: 20 },
   { header: "Call Type", key: "callType", width: 14 },
   { header: "Assigned To", key: "assignedTo", width: 20 },
+  { header: "Priority", key: "priority", width: 10 },
   { header: "Deadline Date", key: "deadlineDate", width: 14 },
   { header: "Status", key: "status", width: 12 },
   { header: "Feedback From User", key: "feedback", width: 16 },
   { header: "Internal Tag", key: "internalTag", width: 12 },
 ] as const;
+
+// Export-only — full remark history doesn't belong in the import template
+// (a re-imported file always creates new tickets, it can't carry remarks
+// into them). Appended after COLUMNS purely for display; import ignores any
+// header it doesn't recognize, so a re-imported export is unaffected.
+const UPDATE_COLUMNS = [{ header: "Remarks", key: "remarks", width: 50 }] as const;
 
 function excelDateToIso(value: unknown): string | undefined {
   if (value === null || value === undefined || value === "") return undefined;
@@ -62,6 +70,7 @@ export async function exportTickets(req: Request, res: Response) {
     assignedTo,
     assignedBy,
     accountManager,
+    priority,
     dateFrom,
     dateTo,
     search,
@@ -73,51 +82,58 @@ export async function exportTickets(req: Request, res: Response) {
 
   if (status) {
     params.push(status);
-    conditions.push(`status = $${params.length}`);
+    conditions.push(`t.status = $${params.length}`);
   }
   if (callType) {
     params.push(callType);
-    conditions.push(`call_type = $${params.length}`);
+    conditions.push(`t.call_type = $${params.length}`);
   }
   if (assignedTo) {
     params.push(assignedTo);
-    conditions.push(`assigned_to = $${params.length}`);
+    conditions.push(`t.assigned_to = $${params.length}`);
   }
   if (accountManager) {
     params.push(accountManager);
-    conditions.push(`account_manager = $${params.length}`);
+    conditions.push(`t.account_manager = $${params.length}`);
   }
   if (assignedBy) {
     params.push(assignedBy);
-    conditions.push(`assigned_by = $${params.length}`);
+    conditions.push(`t.assigned_by = $${params.length}`);
   }
   if (dateFrom) {
     params.push(dateFrom);
-    conditions.push(`ticket_date >= $${params.length}`);
+    conditions.push(`t.ticket_date >= $${params.length}`);
   }
   if (dateTo) {
     params.push(dateTo);
-    conditions.push(`ticket_date <= $${params.length}`);
+    conditions.push(`t.ticket_date <= $${params.length}`);
+  }
+  if (priority) {
+    params.push(priority);
+    conditions.push(`t.priority = $${params.length}`);
   }
   if (search) {
     params.push(`%${search}%`);
-    conditions.push(`(company_name ILIKE $${params.length} OR ticket_no ILIKE $${params.length})`);
+    conditions.push(`(t.company_name ILIKE $${params.length} OR t.ticket_no ILIKE $${params.length})`);
   }
   if (overdue === "true") {
     conditions.push(
-      `status IN ('Pending', 'In Progress') AND deadline_date IS NOT NULL AND deadline_date < CURRENT_DATE`
+      `t.status IN ('Pending', 'In Progress') AND t.deadline_date IS NOT NULL AND t.deadline_date < CURRENT_DATE`
     );
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const result = await pool.query(
-    `SELECT * FROM tickets ${whereClause} ORDER BY sr_no DESC`,
+    `SELECT t.*,
+      (SELECT string_agg(r.remark_date || ': ' || r.body, E'\\n' ORDER BY r.created_at)
+       FROM remarks r WHERE r.ticket_sr_no = t.sr_no) AS remarks
+    FROM tickets t ${whereClause} ORDER BY t.sr_no DESC`,
     params
   );
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Tickets");
-  sheet.columns = COLUMNS as unknown as ExcelJS.Column[];
+  sheet.columns = [...COLUMNS, ...UPDATE_COLUMNS] as unknown as ExcelJS.Column[];
   sheet.getRow(1).font = { bold: true };
 
   for (const row of result.rows) {
@@ -137,14 +153,17 @@ export async function exportTickets(req: Request, res: Response) {
       assignedBy: row.assigned_by,
       callType: row.call_type,
       assignedTo: row.assigned_to,
+      priority: row.priority,
       deadlineDate: row.deadline_date,
       status: row.status,
       feedback: row.feedback,
       internalTag: row.internal_tag,
+      remarks: row.remarks ?? "",
     });
   }
   sheet.getColumn("ticketDate").numFmt = "yyyy-mm-dd";
   sheet.getColumn("deadlineDate").numFmt = "yyyy-mm-dd";
+  sheet.getColumn("remarks").alignment = { wrapText: true };
 
   res.setHeader(
     "Content-Type",
@@ -178,6 +197,7 @@ export async function downloadImportTemplate(_req: Request, res: Response) {
     assignedBy: "Office Manager",
     callType: "Warranty",
     assignedTo: "Pranesh Kute",
+    priority: "P3",
     deadlineDate: "2026-01-22",
     status: "Pending",
     feedback: "",
@@ -192,6 +212,7 @@ export async function downloadImportTemplate(_req: Request, res: Response) {
     { header: "Modes", key: "modes", width: 14 },
     { header: "Call Types", key: "callTypes", width: 16 },
     { header: "Statuses", key: "statuses", width: 14 },
+    { header: "Priorities", key: "priorities", width: 12 },
     { header: "Internal Tags", key: "internalTags", width: 14 },
     { header: "Assigned To (employees)", key: "employees", width: 22 },
   ];
@@ -200,6 +221,7 @@ export async function downloadImportTemplate(_req: Request, res: Response) {
     TICKET_MODES.length,
     CALL_TYPES.length,
     TICKET_STATUSES.length,
+    TICKET_PRIORITIES.length,
     INTERNAL_TAGS.length,
     employeesResult.rows.length
   );
@@ -208,6 +230,7 @@ export async function downloadImportTemplate(_req: Request, res: Response) {
       modes: TICKET_MODES[i] ?? "",
       callTypes: CALL_TYPES[i] ?? "",
       statuses: TICKET_STATUSES[i] ?? "",
+      priorities: TICKET_PRIORITIES[i] ?? "",
       internalTags: INTERNAL_TAGS[i] ?? "",
       employees: employeesResult.rows[i]?.display_name ?? "",
     });
@@ -237,6 +260,7 @@ const importRowSchema = z.object({
   assignedBy: z.string().min(1, "Assigned By is required"),
   callType: z.enum(CALL_TYPES),
   assignedTo: z.string().min(1, "Assigned To is required"),
+  priority: z.enum(TICKET_PRIORITIES).optional(),
   deadlineDate: z.string().optional(),
   status: z.enum(TICKET_STATUSES).optional(),
   feedback: z.string().max(50).optional(),
@@ -323,6 +347,7 @@ export async function importTickets(req: Request, res: Response) {
       assignedBy: cellToString(raw.assignedBy),
       callType: cellToString(raw.callType),
       assignedTo: cellToString(raw.assignedTo),
+      priority: cellToString(raw.priority),
       deadlineDate: excelDateToIso(raw.deadlineDate),
       status: cellToString(raw.status),
       feedback: cellToString(raw.feedback),
@@ -364,8 +389,8 @@ export async function importTickets(req: Request, res: Response) {
         `INSERT INTO tickets (
           ticket_no, ticket_date, mode, customer_id, company_name, contact_name, contact_no, email_id, address,
           model, serial_number, problem, owner_user_id, account_manager, assigned_by, call_type,
-          assigned_to_user_id, assigned_to, deadline_date, status, feedback, internal_tag
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
+          assigned_to_user_id, assigned_to, priority, deadline_date, status, feedback, internal_tag
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
         [
           ticketNo,
           d.ticketDate,
@@ -385,6 +410,7 @@ export async function importTickets(req: Request, res: Response) {
           d.callType,
           assignedToUserId,
           d.assignedTo,
+          d.priority ?? "P3",
           d.deadlineDate || null,
           d.status ?? "Pending",
           d.feedback || null,

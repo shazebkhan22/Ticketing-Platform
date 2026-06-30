@@ -42,6 +42,15 @@ const ADDITIVE_MIGRATIONS = [
   `UPDATE tickets SET customer_id = customers.id
    FROM customers
    WHERE tickets.customer_id IS NULL AND tickets.company_name = customers.name`,
+  // SLA feature removed (to be reimplemented later) in favor of a manual
+  // priority field. deadline_date stays — it's now a plain, manually-set
+  // field with no auto-calculation or breach tracking attached to it.
+  `DO $$ BEGIN
+     CREATE TYPE ticket_priority AS ENUM ('P1', 'P2', 'P3', 'P4');
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS priority ticket_priority NOT NULL DEFAULT 'P3'`,
+  `CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority)`,
+  `DROP TABLE IF EXISTS call_type_targets`,
 ];
 
 async function migrate() {

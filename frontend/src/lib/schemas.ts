@@ -21,6 +21,7 @@ export const ticketFormSchema = z.object({
   assignedBy: z.string().min(1, "Required"),
   callType: z.string().min(1, "Required"),
   assignedToUserId: z.number().int().positive("Select an employee"),
+  priority: z.string().min(1, "Required"),
   deadlineDate: z.string().optional(),
   internalTag: z.string().optional(),
 });

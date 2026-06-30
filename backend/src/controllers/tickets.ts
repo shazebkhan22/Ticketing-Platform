@@ -9,18 +9,8 @@ import {
   CALL_TYPES,
   TICKET_STATUSES,
   INTERNAL_TAGS,
+  TICKET_PRIORITIES,
 } from "../types/ticket";
-
-// A ticket has breached its SLA if it's past deadline and either still open,
-// or was closed after the deadline had already passed — unlike the simpler
-// "overdue" check used for the open-tickets dashboard card, this stays true
-// forever once breached, even after the ticket is closed, since it's a
-// historical fact about how the ticket was handled.
-const SLA_BREACH_SQL = `(t.deadline_date IS NOT NULL AND (
-  CASE WHEN t.closed_at IS NOT NULL THEN t.closed_at::date > t.deadline_date
-       ELSE CURRENT_DATE > t.deadline_date
-  END
-))`;
 
 const createTicketSchema = z.object({
   ticketDate: z.string(),
@@ -44,6 +34,7 @@ const createTicketSchema = z.object({
   // Stored as a user id (must reference an existing user); edit/delete rights
   // follow this field, not who created the ticket.
   assignedToUserId: z.coerce.number().int().positive(),
+  priority: z.enum(TICKET_PRIORITIES).optional(),
   deadlineDate: z.string().optional(),
   internalTag: z.enum(INTERNAL_TAGS).optional(),
 });
@@ -80,6 +71,7 @@ function rowToTicket(row: any) {
     callType: row.call_type,
     assignedToUserId: row.assigned_to_user_id,
     assignedTo: row.assigned_to,
+    priority: row.priority,
     deadlineDate: row.deadline_date,
     status: row.status,
     feedback: row.feedback,
@@ -88,7 +80,6 @@ function rowToTicket(row: any) {
     updatedAt: row.updated_at,
     closedAt: row.closed_at,
     lastRemark: row.last_remark ?? undefined,
-    slaBreached: row.sla_breached ?? false,
   };
 }
 
@@ -99,11 +90,11 @@ export async function listTickets(req: Request, res: Response) {
     assignedTo,
     assignedBy,
     accountManager,
+    priority,
     dateFrom,
     dateTo,
     search,
     overdue,
-    breached,
     page = "1",
     pageSize = "50",
   } = req.query as Record<string, string>;
@@ -139,6 +130,10 @@ export async function listTickets(req: Request, res: Response) {
     params.push(dateTo);
     conditions.push(`t.ticket_date <= $${params.length}`);
   }
+  if (priority) {
+    params.push(priority);
+    conditions.push(`t.priority = $${params.length}`);
+  }
   if (search) {
     params.push(`%${search}%`);
     conditions.push(`(t.company_name ILIKE $${params.length} OR t.ticket_no ILIKE $${params.length})`);
@@ -147,9 +142,6 @@ export async function listTickets(req: Request, res: Response) {
     conditions.push(
       `t.status IN ('Pending', 'In Progress') AND t.deadline_date IS NOT NULL AND t.deadline_date < CURRENT_DATE`
     );
-  }
-  if (breached === "true") {
-    conditions.push(SLA_BREACH_SQL);
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -160,7 +152,7 @@ export async function listTickets(req: Request, res: Response) {
   const query = `
     SELECT t.*, (
       SELECT r.body FROM remarks r WHERE r.ticket_sr_no = t.sr_no ORDER BY r.created_at DESC LIMIT 1
-    ) AS last_remark, ${SLA_BREACH_SQL} AS sla_breached
+    ) AS last_remark
     FROM tickets t
     ${whereClause}
     ORDER BY t.sr_no DESC
@@ -189,8 +181,7 @@ export async function getSummary(_req: Request, res: Response) {
       COUNT(*) FILTER (WHERE status = 'Pending') AS pending,
       COUNT(*) FILTER (WHERE status = 'Closed') AS closed,
       COUNT(*) FILTER (WHERE status = 'In Progress') AS in_progress,
-      COUNT(*) FILTER (WHERE status IN ('Pending', 'In Progress') AND deadline_date IS NOT NULL AND deadline_date < CURRENT_DATE) AS overdue,
-      COUNT(*) FILTER (WHERE ${SLA_BREACH_SQL}) AS breached
+      COUNT(*) FILTER (WHERE status IN ('Pending', 'In Progress') AND deadline_date IS NOT NULL AND deadline_date < CURRENT_DATE) AS overdue
     FROM tickets t
   `);
   const row = result.rows[0];
@@ -200,16 +191,12 @@ export async function getSummary(_req: Request, res: Response) {
     closed: parseInt(row.closed, 10),
     inProgress: parseInt(row.in_progress, 10),
     overdue: parseInt(row.overdue, 10),
-    breached: parseInt(row.breached, 10),
   });
 }
 
 export async function getTicket(req: Request, res: Response) {
   const srNo = parseInt(req.params.srNo, 10);
-  const result = await pool.query(
-    `SELECT t.*, ${SLA_BREACH_SQL} AS sla_breached FROM tickets t WHERE t.sr_no = $1`,
-    [srNo]
-  );
+  const result = await pool.query(`SELECT t.* FROM tickets t WHERE t.sr_no = $1`, [srNo]);
   if (result.rows.length === 0) {
     return res.status(404).json({ error: "Ticket not found" });
   }
@@ -264,33 +251,12 @@ export async function createTicket(req: Request, res: Response) {
     address: d.address,
   });
 
-  // Deadline isn't mandatory input — if the caller didn't set one, fall back
-  // to ticketDate + this call type's target resolution days (configured in
-  // call_type_targets), so SLA tracking works even when nobody remembers to
-  // set a deadline by hand. An explicit deadlineDate always wins.
-  let deadlineDate = d.deadlineDate || null;
-  if (!deadlineDate) {
-    const targetResult = await pool.query(
-      "SELECT target_resolution_days FROM call_type_targets WHERE call_type = $1",
-      [d.callType]
-    );
-    const targetDays = targetResult.rows[0]?.target_resolution_days;
-    if (targetDays != null) {
-      // UTC getters/setters only — ticketDate is a date-only string parsed
-      // as UTC midnight, and mixing in local-time Date methods here would
-      // reintroduce the same off-by-one-day bug fixed in db/pool.ts.
-      const computed = new Date(ticketDate);
-      computed.setUTCDate(computed.getUTCDate() + targetDays);
-      deadlineDate = computed.toISOString().slice(0, 10);
-    }
-  }
-
   const result = await pool.query(
     `INSERT INTO tickets (
       ticket_no, ticket_date, mode, customer_id, company_name, contact_name, contact_no, email_id, address,
       model, serial_number, problem, owner_user_id, account_manager, assigned_by, call_type,
-      assigned_to_user_id, assigned_to, deadline_date, internal_tag
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+      assigned_to_user_id, assigned_to, priority, deadline_date, internal_tag
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
     RETURNING *`,
     [
       ticketNo,
@@ -311,7 +277,8 @@ export async function createTicket(req: Request, res: Response) {
       d.callType,
       d.assignedToUserId,
       assignedToName,
-      deadlineDate,
+      d.priority ?? "P3",
+      d.deadlineDate || null,
       d.internalTag ?? "External",
     ]
   );
@@ -351,6 +318,7 @@ export async function updateTicket(req: Request, res: Response) {
     accountManager: "account_manager",
     assignedBy: "assigned_by",
     callType: "call_type",
+    priority: "priority",
     deadlineDate: "deadline_date",
     internalTag: "internal_tag",
   };

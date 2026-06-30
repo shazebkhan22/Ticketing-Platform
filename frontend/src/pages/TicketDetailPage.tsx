@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function Field({ label, value }: { label: string; value?: string | null }) {
@@ -145,19 +144,11 @@ export function TicketDetailPage() {
             <Field label="Assigned By" value={ticket.assignedBy} />
             <Field label="Call Type" value={ticket.callType} />
             <Field label="Assigned To" value={ticket.assignedTo} />
-            <div>
-              <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-                Deadline
-              </div>
-              <div className="mt-0.5 flex items-center gap-2 text-sm text-neutral-800">
-                {ticket.deadlineDate ? formatDate(ticket.deadlineDate) : "-"}
-                {ticket.slaBreached && (
-                  <Badge variant="secondary" className="rounded-full bg-rose-100 text-rose-800">
-                    SLA Breached
-                  </Badge>
-                )}
-              </div>
-            </div>
+            <Field label="Priority" value={ticket.priority} />
+            <Field
+              label="Deadline"
+              value={ticket.deadlineDate ? formatDate(ticket.deadlineDate) : "-"}
+            />
             <Field label="Created" value={formatDateTime(ticket.createdAt)} />
             <Field label="Last Updated" value={formatDateTime(ticket.updatedAt)} />
           </div>

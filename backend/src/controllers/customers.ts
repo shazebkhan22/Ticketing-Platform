@@ -52,7 +52,7 @@ export async function getCustomer(req: Request, res: Response) {
   const c = customerResult.rows[0];
 
   const ticketsResult = await pool.query(
-    `SELECT sr_no, ticket_no, ticket_date, call_type, status, problem, assigned_to, deadline_date, closed_at
+    `SELECT sr_no, ticket_no, ticket_date, call_type, status, priority, problem, assigned_to, deadline_date, closed_at
      FROM tickets WHERE customer_id = $1 ORDER BY sr_no DESC`,
     [id]
   );
@@ -73,6 +73,7 @@ export async function getCustomer(req: Request, res: Response) {
       ticketDate: r.ticket_date,
       callType: r.call_type,
       status: r.status,
+      priority: r.priority,
       problem: r.problem,
       assignedTo: r.assigned_to,
       deadlineDate: r.deadline_date,

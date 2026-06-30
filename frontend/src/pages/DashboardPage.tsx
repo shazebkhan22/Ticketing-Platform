@@ -12,7 +12,9 @@ import {
 } from "@/hooks/useTickets";
 import type { TicketFilters } from "@/types/ticket";
 import { SUMMARY_CARDS, ALL_FILTER_VALUE, DEFAULT_TICKET_FILTERS } from "@/constants/dashboard";
+import { PRIORITY_CLASSES, PRIORITY_LABELS } from "@/constants/ticket";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatDate, truncateChars } from "@/lib/ticket-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -138,7 +140,7 @@ export function DashboardPage() {
   }
 
   function updateSelectFilter(
-    key: "status" | "callType" | "accountManager" | "assignedTo" | "assignedBy"
+    key: "status" | "callType" | "accountManager" | "assignedTo" | "assignedBy" | "priority"
   ) {
     return (value: string) => updateFilter(key, value === ALL_FILTER_VALUE ? undefined : value);
   }
@@ -226,7 +228,7 @@ export function DashboardPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-5">
         {SUMMARY_CARDS.map((card) => (
           <Card key={card.key} className={cn(card.color)}>
             <CardContent>
@@ -251,7 +253,7 @@ export function DashboardPage() {
               onChange={(e) => updateFilter("search", e.target.value)}
             />
           </div>
-          <div className="min-w-24 flex-1">
+          <div className="min-w-14 flex-1">
             <label className="mb-1 block text-xs font-semibold text-neutral-500">Status</label>
             <Select value={filters.status ?? ALL_FILTER_VALUE} onValueChange={updateSelectFilter("status")}>
               <SelectTrigger className="w-full">
@@ -267,7 +269,7 @@ export function DashboardPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-24 flex-1">
+          <div className="min-w-20 flex-1">
             <label className="mb-1 block text-xs font-semibold text-neutral-500">Call Type</label>
             <Select
               value={filters.callType ?? ALL_FILTER_VALUE}
@@ -286,7 +288,26 @@ export function DashboardPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-32 flex-1">
+          <div className="min-w-20 flex-1">
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">Priority</label>
+            <Select
+              value={filters.priority ?? ALL_FILTER_VALUE}
+              onValueChange={updateSelectFilter("priority")}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_FILTER_VALUE}>All</SelectItem>
+                {options?.priorities.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-28 flex-1">
             <label className="mb-1 block text-xs font-semibold text-neutral-500">
               Account Manager
             </label>
@@ -307,7 +328,7 @@ export function DashboardPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-24 flex-1">
+          <div className="min-w-20 flex-1">
             <label className="mb-1 block text-xs font-semibold text-neutral-500">Assigned To</label>
             <Select
               value={filters.assignedTo ?? ALL_FILTER_VALUE}
@@ -326,7 +347,7 @@ export function DashboardPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-32 flex-1">
+          <div className="min-w-24 flex-1">
             <label className="mb-1 block text-xs font-semibold text-neutral-500">
               Assigned By
             </label>
@@ -382,6 +403,7 @@ export function DashboardPage() {
               <TableHead>Problem</TableHead>
               <TableHead>Assigned By</TableHead>
               <TableHead>Assigned To</TableHead>
+              <TableHead>Priority</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Last Updated</TableHead>
             </TableRow>
@@ -389,14 +411,14 @@ export function DashboardPage() {
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={7} className="py-6 text-center text-neutral-400">
+                <TableCell colSpan={8} className="py-6 text-center text-neutral-400">
                   Loading...
                 </TableCell>
               </TableRow>
             )}
             {!isLoading && tickets.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="py-6 text-center text-neutral-400">
+                <TableCell colSpan={8} className="py-6 text-center text-neutral-400">
                   No tickets found.
                 </TableCell>
               </TableRow>
@@ -414,14 +436,20 @@ export function DashboardPage() {
                 <TableCell>{t.assignedBy}</TableCell>
                 <TableCell>{t.assignedTo}</TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1">
-                    <StatusBadge ticket={t} />
-                    {t.slaBreached && (
-                      <Badge variant="secondary" className="rounded-full bg-rose-100 text-rose-800">
-                        SLA
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge
+                        variant="secondary"
+                        className={cn("rounded-full", PRIORITY_CLASSES[t.priority])}
+                      >
+                        {t.priority}
                       </Badge>
-                    )}
-                  </div>
+                    </TooltipTrigger>
+                    <TooltipContent>{PRIORITY_LABELS[t.priority]}</TooltipContent>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>
+                  <StatusBadge ticket={t} />
                 </TableCell>
                 <TableCell className="text-neutral-500">{formatDate(t.updatedAt)}</TableCell>
               </TableRow>

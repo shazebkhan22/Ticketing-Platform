@@ -21,6 +21,7 @@ export interface CustomerTicketSummary {
   ticketDate: string;
   callType: string;
   status: string;
+  priority: string;
   problem: string;
   assignedTo: string;
   deadlineDate: string | null;

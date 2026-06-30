@@ -55,6 +55,7 @@ export function CustomerDetailPage() {
                 <TableHead>Ticket No</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Call Type</TableHead>
+                <TableHead>Priority</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Problem</TableHead>
                 <TableHead>Assigned To</TableHead>
@@ -64,7 +65,7 @@ export function CustomerDetailPage() {
             <TableBody>
               {tickets.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-neutral-500">
+                  <TableCell colSpan={8} className="text-center text-sm text-neutral-500">
                     No tickets logged for this customer yet.
                   </TableCell>
                 </TableRow>
@@ -78,6 +79,7 @@ export function CustomerDetailPage() {
                     </TableCell>
                     <TableCell className="text-sm text-neutral-500">{formatDate(t.ticketDate)}</TableCell>
                     <TableCell className="text-sm">{t.callType}</TableCell>
+                    <TableCell className="text-sm">{t.priority}</TableCell>
                     <TableCell className="text-sm">
                       <Badge variant="secondary" className={cn("rounded-full", STATUS_CLASSES[t.status])}>
                         {t.status}

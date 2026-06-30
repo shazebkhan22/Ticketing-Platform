@@ -15,7 +15,7 @@
 }
 
 body {
-  @apply bg-slate-50 text-slate-800;
+  @apply bg-white text-neutral-800;
 }
 
 @media print {

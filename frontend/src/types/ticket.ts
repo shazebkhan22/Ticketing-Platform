@@ -11,6 +11,8 @@ export type CallType =
   | "Non-Chargeable";
 export type TicketStatus = "Pending" | "In Progress" | "Closed";
 export type InternalTag = "Internal" | "External";
+// P1 = highest priority, P4 = lowest.
+export type TicketPriority = "P1" | "P2" | "P3" | "P4";
 
 export interface Ticket {
   srNo: number;
@@ -32,6 +34,7 @@ export interface Ticket {
   callType: CallType;
   assignedToUserId: number;
   assignedTo: string;
+  priority: TicketPriority;
   deadlineDate: string | null;
   status: TicketStatus;
   feedback: string | null;
@@ -40,7 +43,6 @@ export interface Ticket {
   updatedAt: string;
   closedAt: string | null;
   lastRemark?: string;
-  slaBreached: boolean;
 }
 
 export interface Remark {
@@ -62,7 +64,6 @@ export interface Summary {
   closed: number;
   inProgress: number;
   overdue: number;
-  breached: number;
 }
 
 export interface Employee {
@@ -75,10 +76,10 @@ export interface MetaOptions {
   callTypes: CallType[];
   statuses: TicketStatus[];
   internalTags: InternalTag[];
+  priorities: TicketPriority[];
   accountManagers: string[];
   assignedBys: string[];
   assignedToOptions: Employee[];
-  slaTargets: Record<string, number | null>;
 }
 
 export interface TicketListResponse {
@@ -94,11 +95,11 @@ export interface TicketFilters {
   assignedTo?: string;
   assignedBy?: string;
   accountManager?: string;
+  priority?: string;
   dateFrom?: string;
   dateTo?: string;
   search?: string;
   overdue?: string;
-  breached?: string;
   page?: number;
   pageSize?: number;
 }
@@ -130,6 +131,7 @@ export interface TicketFormInput {
   assignedBy: string;
   callType: CallType;
   assignedToUserId: number;
+  priority?: TicketPriority;
   deadlineDate?: string;
   internalTag?: InternalTag;
 }

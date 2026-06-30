@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { ticketFormSchema, type TicketFormValues } from "@/lib/schemas";
@@ -50,6 +50,7 @@ const EMPTY_FORM: TicketFormValues = {
   assignedBy: "",
   callType: "Call",
   assignedToUserId: 0,
+  priority: "P3",
   deadlineDate: "",
   internalTag: "External",
 };
@@ -70,6 +71,7 @@ function ticketToFormValues(ticket: TicketDetail["ticket"]): TicketFormValues {
     assignedBy: ticket.assignedBy ?? "",
     callType: ticket.callType,
     assignedToUserId: ticket.assignedToUserId,
+    priority: ticket.priority,
     deadlineDate: ticket.deadlineDate?.slice(0, 10) ?? "",
     internalTag: ticket.internalTag,
   };
@@ -117,13 +119,6 @@ export function TicketFormPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketDetail]);
 
-  // Leaving Deadline Date blank isn't really "no deadline" — the backend
-  // fills it in from this call type's SLA target (ticketDate + target days)
-  // if one is configured, so surface that target here rather than letting
-  // the field look optional when it usually isn't.
-  const selectedCallType = useWatch({ control: form.control, name: "callType" });
-  const slaTargetDays = options?.slaTargets?.[selectedCallType];
-
   async function onSubmit(values: TicketFormValues) {
     try {
       if (isEdit) {
@@ -169,7 +164,7 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Date Received *</FormLabel>
                   <FormControl>
-                    <DatePicker value={field.value} onChange={field.onChange} />
+                    <DatePicker disabled value={field.value} onChange={field.onChange} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -418,19 +413,34 @@ export function TicketFormPage() {
                     <DatePicker
                       value={field.value}
                       onChange={field.onChange}
-                      placeholder={
-                        slaTargetDays != null
-                          ? `Defaults to ${slaTargetDays} day SLA`
-                          : "No deadline"
-                      }
+                      placeholder="No deadline"
                     />
                   </FormControl>
-                  {!field.value && slaTargetDays != null && (
-                    <p className="text-xs text-neutral-500">
-                      Left blank, this will default to {slaTargetDays} day
-                      {slaTargetDays === 1 ? "" : "s"} from the date received ({selectedCallType} SLA).
-                    </p>
-                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="priority"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Priority *</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue>{field.value}</SelectValue>
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {options.priorities.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
