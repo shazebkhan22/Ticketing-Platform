@@ -1,9 +1,9 @@
 import { apiClient } from "./client";
-import type { CustomerDetail, CustomerListResponse } from "@/types/customer";
+import type { CustomerDetail, CustomerFilters, CustomerListResponse } from "@/types/customer";
 
-export async function fetchCustomers(search?: string): Promise<CustomerListResponse> {
+export async function fetchCustomers(filters: CustomerFilters): Promise<CustomerListResponse> {
   const { data } = await apiClient.get<CustomerListResponse>("/customers", {
-    params: search ? { search } : undefined,
+    params: filters,
   });
   return data;
 }

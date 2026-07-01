@@ -1,5 +1,5 @@
 import * as React from "react"
-import { CheckIcon, ChevronsUpDownIcon } from "lucide-react"
+import { CheckIcon, ChevronsUpDownIcon, XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -27,6 +27,7 @@ export function Combobox({
   emptyText = "No results found.",
   allowCustomValue = false,
   disabled,
+  clearable = true,
   className,
 }: {
   options: ComboboxOption[]
@@ -38,6 +39,8 @@ export function Combobox({
   /** When true, typing a value not in `options` and pressing Enter / leaving keeps the typed text as the value — for free-text fields with suggestions. */
   allowCustomValue?: boolean
   disabled?: boolean
+  /** Shows an "x" to reset the field back to empty without reopening the popover and picking something else. */
+  clearable?: boolean
   className?: string
 }) {
   const [open, setOpen] = React.useState(false)
@@ -75,8 +78,29 @@ export function Combobox({
             className
           )}
         >
-          <span className="truncate">{value ? selectedLabel : placeholder}</span>
-          <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
+          <span className="truncate text-muted-foreground">{value ? selectedLabel : placeholder}</span>
+          <span className="ml-2 flex shrink-0 items-center gap-1">
+            {clearable && value && !disabled && (
+              // Button's own styles force `pointer-events: none` on every
+              // svg inside it (so icon glyphs don't swallow clicks meant for
+              // the button) — wrapping the icon in a span and opting back
+              // into pointer-events here is what actually makes it clickable
+              // instead of falling through to the trigger underneath.
+              <span
+                role="button"
+                aria-label="Clear"
+                className="pointer-events-auto rounded-sm p-0.5 opacity-50 hover:bg-foreground/10 hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpen(false)
+                  onChange("")
+                }}
+              >
+                <XIcon className="size-4" />
+              </span>
+            )}
+            <ChevronsUpDownIcon className="size-4 opacity-50" />
+          </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">

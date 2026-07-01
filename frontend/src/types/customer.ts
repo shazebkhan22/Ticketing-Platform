@@ -13,6 +13,15 @@ export interface Customer {
 
 export interface CustomerListResponse {
   customers: Customer[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CustomerFilters {
+  search?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface CustomerTicketSummary {

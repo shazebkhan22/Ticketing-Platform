@@ -8,6 +8,7 @@ CREATE TYPE call_type AS ENUM ('Warranty', 'AMC', 'OEM', 'Office', 'Installation
 CREATE TYPE ticket_status AS ENUM ('Pending', 'In Progress', 'Closed');
 CREATE TYPE internal_tag AS ENUM ('Internal', 'External');
 CREATE TYPE ticket_priority AS ENUM ('P1', 'P2', 'P3', 'P4');
+CREATE TYPE repair_location AS ENUM ('In-House', 'Outsourced');
 
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
@@ -90,6 +91,20 @@ CREATE TABLE remarks (
 
 CREATE INDEX idx_remarks_ticket_sr_no ON remarks(ticket_sr_no);
 
+-- One row per ticket (not per serial number) tracking the physical
+-- inward/outward movement of whatever product(s) came in for repair —
+-- quantity is derived from tickets.serial_number (comma-separated) rather
+-- than stored here, since all units on a ticket move in/out together.
+CREATE TABLE ticket_inventory (
+  ticket_sr_no INTEGER PRIMARY KEY REFERENCES tickets(sr_no) ON DELETE CASCADE,
+  inward_date DATE,
+  outward_date DATE,
+  repair_location repair_location NOT NULL DEFAULT 'In-House',
+  outsource_vendor TEXT,
+  expected_return_date DATE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE activity_log (
   id SERIAL PRIMARY KEY,
   actor_user_id INTEGER REFERENCES users(id),
@@ -126,5 +141,10 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_tickets_updated_at
 BEFORE UPDATE ON tickets
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_ticket_inventory_updated_at
+BEFORE UPDATE ON ticket_inventory
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();

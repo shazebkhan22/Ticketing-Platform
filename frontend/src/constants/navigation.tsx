@@ -19,7 +19,7 @@ export const NAV_MAIN = [
 export const NAV_ADMIN = [
   { title: "Activity Log", url: "/activity", icon: <HistoryIcon /> },
   { title: "Customers", url: "/customers", icon: <BuildingIcon /> },
-  // { title: "Analytics", url: "/analytics", icon: <ChartNoAxesCombined /> },
+  {title: "Inventory", url: "/inventory", icon: <ListChecksIcon />},
 ];
 
 export const NAV_SECONDARY = [

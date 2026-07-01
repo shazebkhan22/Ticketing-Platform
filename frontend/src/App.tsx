@@ -32,7 +32,9 @@ const CustomersPage = lazy(() =>
 const CustomerDetailPage = lazy(() =>
   import("@/pages/CustomerDetailPage").then((m) => ({ default: m.CustomerDetailPage }))
 );
-
+const InventoryPage = lazy(() =>
+  import("@/pages/InventoryPage").then((m) => ({ default: m.InventoryPage }))
+);
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -71,6 +73,7 @@ function App() {
                     <Route path="/activity" element={<ActivityLogPage />} />
                     <Route path="/customers" element={<CustomersPage />} />
                     <Route path="/customers/:id" element={<CustomerDetailPage />} />
+                    <Route path="/inventory" element={<InventoryPage />} />
                     {/* <Route path="/analytics" element={<AnalyticsPage />} /> */}
                   </Route>
                 </Route>

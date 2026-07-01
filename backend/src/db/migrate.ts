@@ -51,6 +51,24 @@ const ADDITIVE_MIGRATIONS = [
   `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS priority ticket_priority NOT NULL DEFAULT 'P3'`,
   `CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority)`,
   `DROP TABLE IF EXISTS call_type_targets`,
+  // Per-ticket inward/outward repair tracking (Inventory page).
+  `DO $$ BEGIN
+     CREATE TYPE repair_location AS ENUM ('In-House', 'Outsourced');
+   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `CREATE TABLE IF NOT EXISTS ticket_inventory (
+    ticket_sr_no INTEGER PRIMARY KEY REFERENCES tickets(sr_no) ON DELETE CASCADE,
+    inward_date DATE,
+    outward_date DATE,
+    repair_location repair_location NOT NULL DEFAULT 'In-House',
+    outsource_vendor TEXT,
+    expected_return_date DATE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`,
+  `DROP TRIGGER IF EXISTS trg_ticket_inventory_updated_at ON ticket_inventory`,
+  `CREATE TRIGGER trg_ticket_inventory_updated_at
+   BEFORE UPDATE ON ticket_inventory
+   FOR EACH ROW
+   EXECUTE FUNCTION set_updated_at()`,
 ];
 
 async function migrate() {

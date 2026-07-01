@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchCustomer, fetchCustomers } from "@/api/customers";
+import type { CustomerFilters } from "@/types/customer";
 
-export function useCustomerList(search?: string) {
+export function useCustomerList(filters: CustomerFilters) {
   return useQuery({
-    queryKey: ["customers", "list", search ?? ""],
-    queryFn: () => fetchCustomers(search),
+    queryKey: ["customers", "list", filters],
+    queryFn: () => fetchCustomers(filters),
   });
 }
 

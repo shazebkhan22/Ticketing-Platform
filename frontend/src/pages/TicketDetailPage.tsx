@@ -26,7 +26,7 @@ function Field({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
       <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">{label}</div>
-      <div className="mt-0.5 text-sm text-neutral-800">{value || "-"}</div>
+      <div className="mt-0.5 text-sm text-neutral-800 wrap-break-word whitespace-normal">{value || "-"}</div>
     </div>
   );
 }
@@ -116,7 +116,7 @@ export function TicketDetailPage() {
       <Card className="mb-6">
         <CardContent>
           <h3 className="mb-3 text-sm font-bold text-cygnus-700">Ticket Details</h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Field label="Date Received" value={formatDate(ticket.ticketDate)} />
             <Field label="Mode" value={ticket.mode} />
             <Field label="Company Name" value={ticket.companyName} />
@@ -126,7 +126,7 @@ export function TicketDetailPage() {
             <Field label="Model" value={ticket.model} />
             <Field label="Serial Number(s)" value={ticket.serialNumber} />
             <Field label="Internal Tag" value={ticket.internalTag} />
-            <div className="md:col-span-3">
+            <div className="md:col-span-2">
               <Field label="Address" value={ticket.address} />
             </div>
             <div className="md:col-span-3">
@@ -139,7 +139,7 @@ export function TicketDetailPage() {
       <Card className="mb-6">
         <CardContent>
           <h3 className="mb-3 text-sm font-bold text-cygnus-700">Assignment Details</h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Field label="Account Manager" value={ticket.accountManager} />
             <Field label="Assigned By" value={ticket.assignedBy} />
             <Field label="Call Type" value={ticket.callType} />
@@ -154,7 +154,7 @@ export function TicketDetailPage() {
           </div>
 
           {canEdit && (
-            <div className="no-print mt-4 flex items-center gap-2">
+            <div className="no-print mt-6 flex items-center gap-3">
               <span className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
                 Change Status:
               </span>
@@ -180,7 +180,7 @@ export function TicketDetailPage() {
             <h3 className="mb-3 text-sm font-bold text-cygnus-700">Feedback From User</h3>
             {canEdit ? (
               <div className="no-print">
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   <Input
                     value={feedbackValue}
                     onChange={(e) => {
@@ -188,7 +188,7 @@ export function TicketDetailPage() {
                       setFeedbackError(null);
                     }}
                     placeholder="e.g. 5/5"
-                    className="max-w-xs"
+                    className="max-w-1/2"
                     aria-invalid={Boolean(feedbackError)}
                   />
                   <Button

@@ -2,7 +2,11 @@ import { Request, Response } from "express";
 import { pool } from "../db/pool";
 
 export async function listCustomers(req: Request, res: Response) {
-  const { search } = req.query as Record<string, string>;
+  const {
+    search,
+    page = "1",
+    pageSize = "7",
+  } = req.query as Record<string, string>;
 
   const conditions: string[] = [];
   const params: any[] = [];
@@ -12,19 +16,26 @@ export async function listCustomers(req: Request, res: Response) {
   }
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  const result = await pool.query(
-    `SELECT
-      c.id, c.name, c.contact_name, c.contact_no, c.email_id, c.address, c.created_at,
-      COUNT(t.sr_no) AS ticket_count,
-      COUNT(t.sr_no) FILTER (WHERE t.status <> 'Closed') AS open_ticket_count,
-      MAX(t.ticket_date) AS last_ticket_date
-    FROM customers c
-    LEFT JOIN tickets t ON t.customer_id = c.id
-    ${whereClause}
-    GROUP BY c.id
-    ORDER BY c.name`,
-    params
-  );
+  const limit = Math.min(parseInt(pageSize, 10) || 7, 200);
+  const offset = (Math.max(parseInt(page, 10) || 1, 1) - 1) * limit;
+
+  const [result, countResult] = await Promise.all([
+    pool.query(
+      `SELECT
+        c.id, c.name, c.contact_name, c.contact_no, c.email_id, c.address, c.created_at,
+        COUNT(t.sr_no) AS ticket_count,
+        COUNT(t.sr_no) FILTER (WHERE t.status <> 'Closed') AS open_ticket_count,
+        MAX(t.ticket_date) AS last_ticket_date
+      FROM customers c
+      LEFT JOIN tickets t ON t.customer_id = c.id
+      ${whereClause}
+      GROUP BY c.id
+      ORDER BY c.name
+      LIMIT ${limit} OFFSET ${offset}`,
+      params
+    ),
+    pool.query(`SELECT COUNT(*) FROM customers c ${whereClause}`, params),
+  ]);
 
   res.json({
     customers: result.rows.map((r) => ({
@@ -39,6 +50,9 @@ export async function listCustomers(req: Request, res: Response) {
       openTicketCount: parseInt(r.open_ticket_count, 10),
       lastTicketDate: r.last_ticket_date,
     })),
+    total: parseInt(countResult.rows[0].count, 10),
+    page: Math.max(parseInt(page, 10) || 1, 1),
+    pageSize: limit,
   });
 }
 
