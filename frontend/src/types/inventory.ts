@@ -1,4 +1,5 @@
 export type RepairLocation = "In-House" | "Outsourced";
+export type DateTypes = "Inward Date" | "Outward Date" | "Expected Return Date";
 
 export interface InventoryItem {
   srNo: number;

@@ -4,7 +4,9 @@ import { toast } from "sonner";
 import { useInventoryList, useUpdateInventory } from "@/hooks/useInventory";
 import type { InventoryFilters, InventoryItem, RepairLocation, EditFormState } from "@/types/inventory";
 import { formatDate, truncateChars } from "@/lib/ticket-utils";
-import { ALL_FILTER_VALUE, STATUS_CLASSES, DEFAULT_FILTERS } from "@/constants/inventory";
+import { ALL_FILTER_VALUE, STATUS_CLASSES, DEFAULT_FILTERS, DATE_TOOLTIPS } from "@/constants/inventory";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -235,29 +237,22 @@ export function InventoryPage() {
 
           {form && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-neutral-500">
+              <div className="gap-3">
+                  <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-neutral-500">
                     Inward Date
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 cursor-help text-red-500" />
+                      </TooltipTrigger>
+                      <TooltipContent>{DATE_TOOLTIPS["Inward Date"]}</TooltipContent>
+                    </Tooltip>
                   </label>
                   <DatePicker
                     value={form.inwardDate}
                     onChange={(v) => setForm({ ...form, inwardDate: v })}
                     placeholder="Not received yet"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-neutral-500">
-                    Outward Date
-                  </label>
-                  <DatePicker
-                    value={form.outwardDate}
-                    onChange={(v) => setForm({ ...form, outwardDate: v })}
-                    placeholder="Not dispatched yet"
-                  />
-                </div>
+                  />       
               </div>
-
               <div>
                 <label className="mb-1 block text-xs font-semibold text-neutral-500">
                   Repair Location
@@ -275,7 +270,6 @@ export function InventoryPage() {
                   </SelectContent>
                 </Select>
               </div>
-
               {form.repairLocation === "Outsourced" && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -289,8 +283,14 @@ export function InventoryPage() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-neutral-500">
+                    <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-neutral-500">
                       Expected Return Date
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 cursor-help text-red-500" />
+                        </TooltipTrigger>
+                        <TooltipContent>{DATE_TOOLTIPS["Expected Return Date"]}</TooltipContent>
+                      </Tooltip>
                     </label>
                     <DatePicker
                       value={form.expectedReturnDate}
@@ -300,6 +300,22 @@ export function InventoryPage() {
                   </div>
                 </div>
               )}
+                                <div>
+                  <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-neutral-500">
+                    Outward Date
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 cursor-help text-red-500" />
+                      </TooltipTrigger>
+                      <TooltipContent>{DATE_TOOLTIPS["Outward Date"]}</TooltipContent>
+                    </Tooltip>
+                  </label>
+                  <DatePicker
+                    value={form.outwardDate}
+                    onChange={(v) => setForm({ ...form, outwardDate: v })}
+                    placeholder="Not dispatched yet"
+                  />
+                </div>
             </div>
           )}
 

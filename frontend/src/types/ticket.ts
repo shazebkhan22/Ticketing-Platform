@@ -11,7 +11,6 @@ export type CallType =
   | "Non-Chargeable";
 export type TicketStatus = "Pending" | "In Progress" | "Closed";
 export type InternalTag = "Internal" | "External";
-// P1 = highest priority, P4 = lowest.
 export type TicketPriority = "P1" | "P2" | "P3" | "P4";
 
 export interface Ticket {
