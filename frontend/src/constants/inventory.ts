@@ -11,7 +11,7 @@ export const STATUS_CLASSES: Record<InventoryItem["derivedStatus"], string> = {
 export const DEFAULT_FILTERS: InventoryFilters = { page: 1, pageSize: 7 };
 
 export const DATE_TOOLTIPS: Record<DateTypes, string> = {
-  "Inward Date": "Set this when the product physically arrives for repair.",
-  "Outward Date": "Set this when the product is dispatched back after repair.",
+  "Inward Date": "Set this when the product physically arrives for repair from customer.",
+  "Outward Date": "Set this when the product is dispatched back after repair to customer.",
   "Expected Return Date": "Set this to the date the outsourced vendor is expected to return the product.",
 };

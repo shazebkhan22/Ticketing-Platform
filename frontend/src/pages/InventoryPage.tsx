@@ -242,7 +242,7 @@ export function InventoryPage() {
                     Inward Date
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Info className="h-3.5 w-3.5 cursor-help text-red-500" />
+                        <Info className="h-3.5 w-3.5 cursor-help text-primary" />
                       </TooltipTrigger>
                       <TooltipContent>{DATE_TOOLTIPS["Inward Date"]}</TooltipContent>
                     </Tooltip>
@@ -287,7 +287,7 @@ export function InventoryPage() {
                       Expected Return Date
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Info className="h-3.5 w-3.5 cursor-help text-red-500" />
+                          <Info className="h-3.5 w-3.5 cursor-help text-primary" />
                         </TooltipTrigger>
                         <TooltipContent>{DATE_TOOLTIPS["Expected Return Date"]}</TooltipContent>
                       </Tooltip>
@@ -305,7 +305,7 @@ export function InventoryPage() {
                     Outward Date
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Info className="h-3.5 w-3.5 cursor-help text-red-500" />
+                        <Info className="h-3.5 w-3.5 cursor-help text-primary" />
                       </TooltipTrigger>
                       <TooltipContent>{DATE_TOOLTIPS["Outward Date"]}</TooltipContent>
                     </Tooltip>

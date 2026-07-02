@@ -72,7 +72,7 @@ export function DashboardPage() {
     return filters;
   }, [filters, isOverdueView, isMineView, currentUserDisplayName]);
 
-  const { data: summary } = useSummary();
+  const { data: summary } = useSummary(isMineView ? currentUserDisplayName : undefined);
   const { data: options } = useMetaOptions();
   const { data: ticketsResponse, isLoading } = useTicketList(effectiveFilters);
 

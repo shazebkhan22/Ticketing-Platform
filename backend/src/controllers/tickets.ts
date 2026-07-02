@@ -174,8 +174,13 @@ export async function listTickets(req: Request, res: Response) {
   });
 }
 
-export async function getSummary(_req: Request, res: Response) {
-  const result = await pool.query(`
+export async function getSummary(req: Request, res: Response) {
+  const { assignedTo } = req.query as Record<string, string>;
+  const whereClause = assignedTo ? "WHERE t.assigned_to = $1" : "";
+  const params = assignedTo ? [assignedTo] : [];
+
+  const result = await pool.query(
+    `
     SELECT
       COUNT(*) AS total,
       COUNT(*) FILTER (WHERE status = 'Pending') AS pending,
@@ -183,7 +188,10 @@ export async function getSummary(_req: Request, res: Response) {
       COUNT(*) FILTER (WHERE status = 'In Progress') AS in_progress,
       COUNT(*) FILTER (WHERE status IN ('Pending', 'In Progress') AND deadline_date IS NOT NULL AND deadline_date < CURRENT_DATE) AS overdue
     FROM tickets t
-  `);
+    ${whereClause}
+  `,
+    params
+  );
   const row = result.rows[0];
   res.json({
     total: parseInt(row.total, 10),
