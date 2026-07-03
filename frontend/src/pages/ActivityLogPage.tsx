@@ -74,7 +74,7 @@ export function ActivityLogPage() {
                       {entry.ticketSrNo ? (
                         <Link
                           to={`/tickets/${entry.ticketSrNo}`}
-                          className="text-blue-600 hover:underline"
+                          className="text-blue-800 hover:underline font-medium"
                         >
                           {entry.ticketNo}
                         </Link>
