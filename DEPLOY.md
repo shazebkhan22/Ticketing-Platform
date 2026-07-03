@@ -4,6 +4,11 @@ One Nginx container serves the frontend and reverse-proxies `/api` to the
 backend — same origin, so the session cookie works without any CORS/SameSite
 complications.
 
+See `backend/README.md` and `frontend/README.md` for how each half of the
+app is structured and how to run them outside Docker for local development.
+See root `CHANGELOG.md` for a running log of notable changes and whether
+they required anything beyond a plain redeploy (e.g. a migration).
+
 ## One-time setup on the server
 
 ```bash
@@ -66,4 +71,6 @@ docker compose -f docker-compose.prod.yml up -d --build
 No migration step needed unless `backend/src/db/schema.sql` changed — that
 file only applies once, on a database that doesn't yet have a `tickets`
 table, so check the README before assuming a schema change will apply
-automatically.
+automatically. Pure validation/logic changes (e.g. the 2026-07-03 inventory
+and ticket form validation rules — see `CHANGELOG.md`) don't touch the
+schema and only need this rebuild-and-restart step, no migration.

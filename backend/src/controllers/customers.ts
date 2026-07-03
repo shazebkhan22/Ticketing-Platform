@@ -66,8 +66,16 @@ export async function getCustomer(req: Request, res: Response) {
   const c = customerResult.rows[0];
 
   const ticketsResult = await pool.query(
-    `SELECT sr_no, ticket_no, ticket_date, call_type, status, priority, problem, assigned_to, deadline_date, closed_at
-     FROM tickets WHERE customer_id = $1 ORDER BY sr_no DESC`,
+    `SELECT t.sr_no, t.ticket_no, t.ticket_date, t.call_type, t.status, t.priority, t.problem,
+       t.deadline_date, t.closed_at, COALESCE(assignee_agg.assignees, '[]'::json) AS assignees
+     FROM tickets t
+     LEFT JOIN LATERAL (
+       SELECT json_agg(json_build_object('id', ta.user_id, 'displayName', u.display_name) ORDER BY u.display_name) AS assignees
+       FROM ticket_assignees ta
+       JOIN users u ON u.id = ta.user_id
+       WHERE ta.ticket_sr_no = t.sr_no
+     ) assignee_agg ON true
+     WHERE t.customer_id = $1 ORDER BY t.sr_no DESC`,
     [id]
   );
 
@@ -89,7 +97,7 @@ export async function getCustomer(req: Request, res: Response) {
       status: r.status,
       priority: r.priority,
       problem: r.problem,
-      assignedTo: r.assigned_to,
+      assignees: r.assignees ?? [],
       deadlineDate: r.deadline_date,
       closedAt: r.closed_at,
     })),

@@ -46,9 +46,9 @@ export async function importTickets(file: File): Promise<ImportResult> {
   return data;
 }
 
-export async function fetchSummary(assignedTo?: string): Promise<Summary> {
+export async function fetchSummary(assigneeUserId?: number): Promise<Summary> {
   const { data } = await apiClient.get<Summary>("/tickets/summary", {
-    params: assignedTo ? { assignedTo } : undefined,
+    params: assigneeUserId ? { assigneeUserId } : undefined,
   });
   return data;
 }

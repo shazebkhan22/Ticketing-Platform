@@ -51,6 +51,9 @@ const ADDITIVE_MIGRATIONS = [
   `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS priority ticket_priority NOT NULL DEFAULT 'P3'`,
   `CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority)`,
   `DROP TABLE IF EXISTS call_type_targets`,
+  // "POC" was added to the CALL_TYPES const/dropdown without a matching
+  // enum migration — ADD VALUE IF NOT EXISTS keeps this safe to re-run.
+  `ALTER TYPE call_type ADD VALUE IF NOT EXISTS 'POC'`,
   // Per-ticket inward/outward repair tracking (Inventory page).
   `DO $$ BEGIN
      CREATE TYPE repair_location AS ENUM ('In-House', 'Outsourced');
@@ -69,6 +72,34 @@ const ADDITIVE_MIGRATIONS = [
    BEFORE UPDATE ON ticket_inventory
    FOR EACH ROW
    EXECUTE FUNCTION set_updated_at()`,
+  // Multi-assignee tickets: replaces the single assigned_to_user_id/
+  // assigned_to columns with a join table.
+  `CREATE TABLE IF NOT EXISTS ticket_assignees (
+    ticket_sr_no INTEGER NOT NULL REFERENCES tickets(sr_no) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    PRIMARY KEY (ticket_sr_no, user_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_ticket_assignees_user_id ON ticket_assignees(user_id)`,
+  // Backfill + drop the old columns in one guarded block, keyed on the
+  // column still existing — the backfill SELECT references
+  // assigned_to_user_id, so this whole block must become a no-op (not
+  // error) on every deploy after the first time it runs, once that column
+  // is gone.
+  `DO $$ BEGIN
+     IF EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_name = 'tickets' AND column_name = 'assigned_to_user_id'
+     ) THEN
+       INSERT INTO ticket_assignees (ticket_sr_no, user_id)
+       SELECT sr_no, assigned_to_user_id FROM tickets
+       WHERE assigned_to_user_id IS NOT NULL
+       ON CONFLICT (ticket_sr_no, user_id) DO NOTHING;
+       DROP INDEX IF EXISTS idx_tickets_assigned_to;
+       DROP INDEX IF EXISTS idx_tickets_assigned_to_user_id;
+       ALTER TABLE tickets DROP COLUMN assigned_to_user_id;
+       ALTER TABLE tickets DROP COLUMN assigned_to;
+     END IF;
+   END $$`,
 ];
 
 async function migrate() {

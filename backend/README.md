@@ -197,8 +197,6 @@ The core entity. Maps 1:1 to the spec's 20-field ticket schema (Sr No through In
 | `owner_user_id` | INTEGER NOT NULL, FK → `users(id)` | — (not in original spec) | **The employee who created the ticket.** Set automatically server-side at creation from `req.session.userId` — never accepted from client input. Purely informational ("who logged this") — it does **not** grant edit rights; see [§7](#7-authentication--sessions). |
 | `account_manager` | TEXT NOT NULL | Account Manager | **Free text, user-supplied at creation.** Means "the person in the office who reported/raised this issue" — can be anybody, not necessarily one of the 5 platform accounts, and is not tied to `owner_user_id`. Editable via `PUT`. |
 | `call_type` | `call_type` enum | Call Type | Warranty / AMC / OEM / Office / Installation / Project / Call |
-| `assigned_to_user_id` | INTEGER NOT NULL, FK → `users(id)` | — (not in original spec) | **The employee responsible for resolving the ticket.** Chosen at creation (and re-assignable via `PUT`) from the 5 platform accounts. This is the actual permission record used by `requireAssigneeOrAdmin` — see [§7](#7-authentication--sessions). |
-| `assigned_to` | TEXT NOT NULL | Assigned To | **Denormalized copy of the assignee's `display_name`**, kept in sync with `assigned_to_user_id` on every create/reassign so existing filter/search queries by name continue to work without a join. (Note: the spec's "Assigned By" field was removed — superseded by `account_manager`, which already records who raised the issue.) |
 | `deadline_date` | DATE | — (not in original spec) | Optional target completion date, set manually on the form. Not auto-calculated from `call_type_targets` currently — see [§14](#14-known-gaps--not-yet-built). |
 | `status` | `ticket_status` enum | Status | Pending (default) / In Progress / Closed |
 | `feedback` | TEXT | Feedback From User | nullable, free text (e.g. "5/5") |
@@ -207,9 +205,19 @@ The core entity. Maps 1:1 to the spec's 20-field ticket schema (Sr No through In
 | `updated_at` | TIMESTAMPTZ | — | auto-updated by trigger on every `UPDATE` — see [§6.3](#63-triggers) |
 | `closed_at` | TIMESTAMPTZ | — | set automatically when status transitions to `Closed` (see `updateTicketStatus` controller) |
 
-Note: "Remarks" from the spec is **not** a column on this table — it's the separate `remarks` table below, because it's an append-only list, not a single value.
+Note: "Remarks" from the spec is **not** a column on this table — it's the separate `remarks` table below, because it's an append-only list, not a single value. "Assigned To" is likewise not a column here — see `ticket_assignees` below (a ticket can have more than one assignee as of 2026-07-03; see root `CHANGELOG.md`).
 
-**Indexes:** `status`, `call_type`, `assigned_to`, `assigned_to_user_id`, `account_manager`, `owner_user_id`, `ticket_date`, `company_name` — these cover every filter the dashboard supports plus the assignment check on every write request.
+**Indexes:** `status`, `call_type`, `account_manager`, `owner_user_id`, `ticket_date`, `company_name` — these cover every filter the dashboard supports.
+
+#### `ticket_assignees`
+Many-to-many join between tickets and their assignees — a ticket can have multiple assignees, all of whom get full edit rights (see [§7](#7-authentication--sessions)).
+
+| Column | Type | Notes |
+|---|---|---|
+| `ticket_sr_no` | INTEGER, FK → `tickets.sr_no` | `ON DELETE CASCADE` — deleting a ticket deletes its assignments |
+| `user_id` | INTEGER, FK → `users(id)` | |
+
+`PRIMARY KEY (ticket_sr_no, user_id)` — a user can't be assigned to the same ticket twice. No denormalized display name column: every read joins to `users` for `display_name` (deliberately, to avoid the staleness a copied name would risk — see `resolveAssignees()` and the `ASSIGNEES_LATERAL_JOIN` query fragment in `controllers/tickets.ts`). Indexed on `user_id` for the "my tickets" / assignee-filter queries.
 
 #### `remarks`
 The append-only timeline. One row per update.
@@ -286,24 +294,26 @@ The matching TypeScript const arrays live in `src/types/ticket.ts` (`TICKET_MODE
 There are two layers to authorization, and it's important to understand both:
 
 1. **Role** (`admin` or `employee`) — stored on `users.role`. Only one account (`parmanand`) is `admin`.
-2. **Assignment** (`tickets.assigned_to_user_id`) — every ticket is currently assigned to exactly one employee, chosen at creation and re-assignable later. This is **independent of who created the ticket** (`owner_user_id`, informational only) — a ticket logged by one employee is commonly assigned to a different one to actually resolve it, and *that assignee* is who gets edit rights, not the creator.
+2. **Assignment** (`ticket_assignees`) — a ticket can be assigned to multiple employees (as of 2026-07-03; see root `CHANGELOG.md`), chosen at creation and re-assignable later. This is **independent of who created the ticket** (`owner_user_id`, informational only) — a ticket logged by one employee is commonly assigned to others to actually resolve it, and *the assignees* are who get edit rights, not the creator.
 
-The actual rule, enforced server-side in `src/middleware/auth.ts`:
+**Who can assign whom**, enforced in `resolveAssignees()` in `src/controllers/tickets.ts`: admins may assign a ticket to any mix of admins/employees. Non-admin employees must include themselves in the assignee set and may only add other employees as co-assignees — never an admin.
 
-| Action | Admin | Assignee (employee the ticket is assigned to) | Any other employee |
+The edit-rights rule, enforced server-side in `src/middleware/auth.ts`:
+
+| Action | Admin | Assignee (an employee the ticket is assigned to) | Any other employee |
 |---|---|---|---|
 | **Read** any ticket (list, detail) | ✅ | ✅ | ✅ — the dashboard is fully shared, everyone sees every ticket |
-| **Create** a ticket | ✅ | ✅ (chooses the assignee) | ✅ (chooses the assignee) |
-| **Edit** core fields, change status, set feedback, add a remark, delete, reassign | ✅ on **any** ticket | ✅ on tickets **assigned to them** | ❌ 403 on tickets not assigned to them |
+| **Create** a ticket | ✅ | ✅ (chooses the assignee set) | ✅ (chooses the assignee set) |
+| **Edit** core fields, change status, set feedback, add a remark, delete, reassign | ✅ on **any** ticket | ✅ on tickets **they're an assignee of** | ❌ 403 on tickets they're not assigned to |
 
 Three middleware functions implement this:
 - `requireAuth` — any logged-in user (401 if not logged in). Used on all read routes.
 - `requireAdmin` — must be logged in AND `role === 'admin'` (401 / 403). Not currently used by any ticket route (see below) but kept for any future admin-only feature (e.g. SMTP config).
-- `requireAssigneeOrAdmin` — the one that actually guards ticket mutations. Logic: if `role === 'admin'`, allow immediately. Otherwise, look up `tickets.assigned_to_user_id` for the `:srNo` in the URL and compare it to `req.session.userId`; allow only on a match, else `403 { error: "You can only modify tickets assigned to you" }`. Returns `404` if the ticket doesn't exist at all.
+- `requireAssigneeOrAdmin` — the one that actually guards ticket mutations. Logic: if `role === 'admin'`, allow immediately. Otherwise, check `ticket_assignees` for a row matching both the `:srNo` in the URL and `req.session.userId`; allow only if one exists, else `403 { error: "You can only modify tickets assigned to you" }`. Returns `404` if the ticket doesn't exist at all.
 
 This middleware is applied per-route in `src/routes/tickets.ts` to: `PUT /:srNo`, `PATCH /:srNo/status`, `PATCH /:srNo/feedback`, `DELETE /:srNo`, and `POST /:srNo/remarks`. It is deliberately **not** applied to `GET` routes — reads are always allowed for any authenticated user, since the dashboard is shared.
 
-**Important:** this is enforced at the API layer, not just hidden in the UI — the frontend hides buttons a user can't use (see `TicketDetailPage.tsx`'s `canEdit` check, which compares `user.id` against `ticket.assignedToUserId`), but even if someone crafts a raw request, the backend will reject it with 403. Don't rely on the frontend alone if you're auditing this.
+**Important:** this is enforced at the API layer, not just hidden in the UI — the frontend hides buttons a user can't use (see `TicketDetailPage.tsx`'s `canEdit` check, which checks whether `user.id` appears in `ticket.assignees`), but even if someone crafts a raw request, the backend will reject it with 403. Don't rely on the frontend alone if you're auditing this.
 
 ---
 
@@ -329,7 +339,7 @@ No body. Destroys the session and clears the cookie.
 - 200 → `{ success: true }`
 
 #### `GET /api/auth/me`
-Returns the current session's identity (use this on frontend app load to check "am I logged in?" and to compute `canEdit` against a ticket's `assignedToUserId`).
+Returns the current session's identity (use this on frontend app load to check "am I logged in?" and to compute `canEdit` against a ticket's `assignees`).
 - 200 → `{ id, username, role, displayName }`
 - 401 → not logged in
 
@@ -352,7 +362,7 @@ List + filter + paginate. All query params optional.
 |---|---|---|
 | `status` | string | exact match on status |
 | `callType` | string | exact match on call type |
-| `assignedTo` | string | exact match |
+| `assigneeUserId` | number | tickets where this user id is one of the assignees |
 | `accountManager` | string | exact match |
 | `dateFrom` | `YYYY-MM-DD` | `ticket_date >= dateFrom` |
 | `dateTo` | `YYYY-MM-DD` | `ticket_date <= dateTo` |
@@ -384,7 +394,7 @@ Full ticket detail + entire remarks history (oldest → newest).
 - 404 → no ticket with that `srNo`
 
 #### `POST /api/tickets`
-Create a new ticket. `ticketNo` and `ownerUserId` are generated server-side from the logged-in session — do not pass them; they're not accepted in the request body at all. `accountManager` (free text, who reported the issue) and `assignedToUserId` (which employee will resolve it) **are** required in the body.
+Create a new ticket. `ticketNo` and `ownerUserId` are generated server-side from the logged-in session — do not pass them; they're not accepted in the request body at all. `accountManager` (free text, who reported the issue) and `assigneeUserIds` (which employee(s) will resolve it) **are** required in the body.
 
 Body (required fields marked, see `createTicketSchema` in `controllers/tickets.ts` for exact zod rules):
 ```json
@@ -401,19 +411,20 @@ Body (required fields marked, see `createTicketSchema` in `controllers/tickets.t
   "problem": "Laptop not booting",   // required
   "accountManager": "Reception Desk - Sunita",  // required, free text — who reported the issue
   "callType": "Warranty",            // required, one of CALL_TYPES
-  "assignedToUserId": 3,             // required, must be an existing user id
+  "assigneeUserIds": [3, 4],         // required, non-empty array of existing user ids — see the who-can-assign-whom rule in §7
   "deadlineDate": "2026-06-30",      // optional, YYYY-MM-DD
   "internalTag": "External"          // optional, defaults to "External"
 }
 ```
-- 201 → the created ticket object, with `ownerUserId` = the creator's user id, and `assignedTo` = the chosen assignee's `display_name` (denormalized from `assignedToUserId`)
-- 400 → validation error (`{ error: <zod flatten output> }`), including if `assignedToUserId` doesn't reference an existing user
+- 201 → the created ticket object, with `ownerUserId` = the creator's user id, and `assignees` = `[{id, displayName}, ...]` for the chosen assignee set
+- 400 → validation error (`{ error: <zod flatten output> }`), including if any `assigneeUserIds` entry doesn't reference an existing user, or if `deadlineDate` is set and falls before `ticketDate`
+- 403 → a non-admin tried to omit themselves from `assigneeUserIds`, or tried to add an admin as a co-assignee
 
 #### `PUT /api/tickets/:srNo`
-**Assignee or admin only.** Edit core ticket fields, including reassigning (`assignedToUserId`) and the `accountManager` text. Same shape as create, but every field is optional (`.partial()`) — send only the fields you want to change. **Cannot be used to change status or feedback** — those have dedicated endpoints (matches spec: "Edit button for core fields (not remarks)"). Reassigning updates both `assigned_to_user_id` and the denormalized `assigned_to` name together.
+**Assignee or admin only.** Edit core ticket fields, including reassigning (`assigneeUserIds`) and the `accountManager` text. Same shape as create, but every field is optional (`.partial()`) — send only the fields you want to change. **Cannot be used to change status or feedback** — those have dedicated endpoints (matches spec: "Edit button for core fields (not remarks)"). Reassigning replaces the full `ticket_assignees` row set for this ticket (delete then re-insert), not a diff/merge.
 - 200 → updated ticket
-- 400 → no fields provided, validation error, or `assignedToUserId` doesn't reference an existing user
-- 403 → logged in, but not the assignee and not admin
+- 400 → no fields provided, validation error, an `assigneeUserIds` entry doesn't reference an existing user, or the resulting `deadlineDate`/`ticketDate` pair (mixing the patch with whichever value isn't being changed) has the deadline before the ticket date
+- 403 → logged in, but not an assignee and not admin; or (when reassigning) a non-admin tried to omit themselves or add an admin
 - 404 → ticket not found
 
 #### `PATCH /api/tickets/:srNo/status`
@@ -433,8 +444,9 @@ This is also where the closure-confirmation email *will* hook in (not implemente
 ```json
 { "feedback": "5/5" }
 ```
-Free text, max 50 chars (covers both "5/5" style and star-rating-as-text). Per spec, the frontend should only show this field while status ≠ Closed for editing, but the backend doesn't currently enforce that restriction — it's a UI-layer rule.
+Free text, max 50 chars (covers both "5/5" style and star-rating-as-text). The ticket's `status` must already be `Closed` — the frontend only shows this field once a ticket is closed, and the backend independently re-checks the ticket's current status before writing (added 2026-07-03; see root `CHANGELOG.md`).
 - 200 → updated ticket
+- 400 → ticket status is not `Closed`
 - 403 → logged in, but not the assignee and not admin
 - 404 → not found
 
@@ -468,17 +480,17 @@ Returns every dropdown's valid values in one call — the frontend should call t
   "internalTags": ["Internal", "External"],
   "accountManagers": ["Reception Desk - Sunita", "..."],
   "assignedToOptions": [
-    { "id": 1, "displayName": "Parmanand Pandey" },
-    { "id": 2, "displayName": "Jitesh Malhotra" },
-    { "id": 3, "displayName": "Pranesh Kute" },
-    { "id": 4, "displayName": "Raghvendra Mishra" },
-    { "id": 5, "displayName": "Manoj Mohite" }
+    { "id": 1, "displayName": "Parmanand Pandey", "role": "admin" },
+    { "id": 2, "displayName": "Jitesh Malhotra", "role": "employee" },
+    { "id": 3, "displayName": "Pranesh Kute", "role": "employee" },
+    { "id": 4, "displayName": "Raghvendra Mishra", "role": "employee" },
+    { "id": 5, "displayName": "Manoj Mohite", "role": "employee" }
   ]
 }
 ```
 Both lists are dynamic, but for different reasons:
 - `accountManagers` is `SELECT DISTINCT account_manager FROM tickets` — since "Account Manager" is free text (anybody in the office could report an issue), there's no fixed list to seed; this just surfaces previously-used values as filter suggestions on the dashboard, and grows organically as new names get typed in.
-- `assignedToOptions` is `SELECT id, display_name FROM users` — "Assigned To" must be one of the 5 real platform accounts (the employees who actually resolve tickets), so the frontend gets `{id, displayName}` pairs: the ticket form submits `assignedToUserId`, while the dashboard filter and detail page display `displayName`.
+- `assignedToOptions` is `SELECT id, display_name, role FROM users` — "Assigned To" must be one of the real platform accounts (the employees who actually resolve tickets), so the frontend gets `{id, displayName, role}` triples: the ticket form submits `assigneeUserIds` (an array), the `role` field lets it filter which employees a non-admin is allowed to add as a co-assignee (see §7's who-can-assign-whom rule), and the dashboard filter/detail page display `displayName`.
 
 `modes`, `callTypes`, `statuses`, `internalTags` are fixed const arrays in `types/ticket.ts`.
 
@@ -488,7 +500,9 @@ Both lists are dynamic, but for different reasons:
 
 Every write endpoint validates `req.body` with a `zod` schema before touching the database. If validation fails, the controller returns `400` with `{ error: parsed.error.flatten() }` — a structured object listing exactly which field(s) failed and why, so the frontend can show inline errors.
 
-Validation schemas live inline at the top of `src/controllers/tickets.ts` (`createTicketSchema`, `updateTicketSchema`, `statusSchema`, `remarkSchema`, `feedbackSchema`). They reuse the const arrays from `types/ticket.ts` via `z.enum(...)` so the valid-values list only needs to be maintained in one place.
+Validation schemas live inline at the top of `src/controllers/tickets.ts` (`createTicketSchema`, `updateTicketSchema`, `statusSchema`, `remarkSchema`, `feedbackSchema`) and `src/controllers/inventory.ts` (`upsertInventorySchema`). They reuse the const arrays from `types/ticket.ts` via `z.enum(...)` so the valid-values list only needs to be maintained in one place.
+
+**Cross-field rules** (a field's validity depends on another field, so plain `zod` shape validation isn't enough) are checked as plain `if` statements at the top of the controller function, after the `zod` parse succeeds and before any query runs — e.g. `createTicket`/`updateTicket` reject a `deadlineDate` before `ticketDate`, and `upsertInventory` rejects an outward date with no inward date, an inward date after the outward date, an outsourced repair missing a vendor/expected-return-date, or an expected return date after the outward date. See root `CHANGELOG.md` for the full current list and the matching frontend checks.
 
 ---
 
@@ -554,4 +568,4 @@ These exist in the original spec but have no implementation yet — don't assume
 - **Excel import** (pre-populate from existing spreadsheet) and **Excel export** (filtered table → `.xlsx`) — `exceljs`/`multer` installed, no routes built.
 - **SMTP admin settings UI/API** — table exists, no endpoint.
 - **Per-call-type target resolution day editing** — `call_type_targets` table is seeded with defaults (Warranty=7, AMC=3) but there's no API to view/edit these from an admin panel yet.
-- **Frontend** — none of this is wired to a UI yet; this backend has only been tested via `curl`.
+- **Frontend** — a full React SPA now exists (see `frontend/README.md`), including pages this document doesn't cover yet: Customers, Inventory, Activity Log, Profile. Their routes/controllers (`routes/customers.ts`, `controllers/customers.ts`, `routes/inventory.ts`, `controllers/inventory.ts`, `routes/activity.ts`) exist and work but aren't documented in [§8](#8-api-reference) yet — read those files directly, or the frontend's `src/api/*.ts` wrappers, until this section is updated.

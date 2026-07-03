@@ -57,22 +57,21 @@ export function DashboardPage() {
 
   const isOverdueView = searchParams.get("overdue") === "true";
   const isMineView = searchParams.get("mine") === "true";
-  const currentUserDisplayName = user?.displayName;
 
   // Sidebar quick-links ("My Tickets" / "Overdue") drive the query via URL
   // search params rather than local state, so switching between them doesn't
   // need an effect — it's derived directly from the URL on every render.
   const effectiveFilters = useMemo<TicketFilters>(() => {
     if (isOverdueView) {
-      return { ...filters, overdue: "true", assignedTo: undefined };
+      return { ...filters, overdue: "true", assigneeUserId: undefined };
     }
-    if (isMineView && currentUserDisplayName) {
-      return { ...filters, assignedTo: currentUserDisplayName, overdue: undefined };
+    if (isMineView && user) {
+      return { ...filters, assigneeUserId: user.id, overdue: undefined };
     }
     return filters;
-  }, [filters, isOverdueView, isMineView, currentUserDisplayName]);
+  }, [filters, isOverdueView, isMineView, user]);
 
-  const { data: summary } = useSummary(isMineView ? currentUserDisplayName : undefined);
+  const { data: summary } = useSummary(isMineView ? user?.id : undefined);
   const { data: options } = useMetaOptions();
   const { data: ticketsResponse, isLoading } = useTicketList(effectiveFilters);
 
@@ -140,9 +139,13 @@ export function DashboardPage() {
   }
 
   function updateSelectFilter(
-    key: "status" | "callType" | "accountManager" | "assignedTo" | "assignedBy" | "priority"
+    key: "status" | "callType" | "accountManager" | "assignedBy" | "priority"
   ) {
     return (value: string) => updateFilter(key, value === ALL_FILTER_VALUE ? undefined : value);
+  }
+
+  function updateAssigneeFilter(value: string) {
+    updateFilter("assigneeUserId", value === ALL_FILTER_VALUE ? undefined : Number(value));
   }
 
   const pageSize = filters.pageSize ?? 7;
@@ -331,8 +334,8 @@ export function DashboardPage() {
           <div className="min-w-20 flex-1">
             <label className="mb-1 block text-xs font-semibold text-neutral-500">Assigned To</label>
             <Select
-              value={filters.assignedTo ?? ALL_FILTER_VALUE}
-              onValueChange={updateSelectFilter("assignedTo")}
+              value={filters.assigneeUserId ? String(filters.assigneeUserId) : ALL_FILTER_VALUE}
+              onValueChange={updateAssigneeFilter}
             >
               <SelectTrigger className="w-full">
                 <SelectValue />
@@ -340,7 +343,7 @@ export function DashboardPage() {
               <SelectContent>
                 <SelectItem value={ALL_FILTER_VALUE}>All</SelectItem>
                 {options?.assignedToOptions.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.displayName}>
+                  <SelectItem key={emp.id} value={String(emp.id)}>
                     {emp.displayName}
                   </SelectItem>
                 ))}
@@ -434,7 +437,7 @@ export function DashboardPage() {
                 <TableCell>{truncateChars(t.companyName, 13)}</TableCell>
                 <TableCell className="max-w-56 truncate whitespace-normal">{truncateChars(t.problem, 15)}</TableCell>
                 <TableCell>{t.assignedBy}</TableCell>
-                <TableCell>{t.assignedTo}</TableCell>
+                <TableCell>{truncateChars(t.assignees.map((a) => a.displayName).join(", "), 18)}</TableCell>
                 <TableCell>
                   <Tooltip>
                     <TooltipTrigger asChild>

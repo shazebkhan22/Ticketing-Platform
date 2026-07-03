@@ -18,16 +18,16 @@ import type { TicketFilters, TicketFormInput } from "@/types/ticket";
 
 export const ticketKeys = {
   all: ["tickets"] as const,
-  summary: (assignedTo?: string) => [...ticketKeys.all, "summary", assignedTo ?? null] as const,
+  summary: (assigneeUserId?: number) => [...ticketKeys.all, "summary", assigneeUserId ?? null] as const,
   list: (filters: TicketFilters) => [...ticketKeys.all, "list", filters] as const,
   detail: (srNo: number) => [...ticketKeys.all, "detail", srNo] as const,
   meta: () => ["meta", "options"] as const,
 };
 
-export function useSummary(assignedTo?: string) {
+export function useSummary(assigneeUserId?: number) {
   return useQuery({
-    queryKey: ticketKeys.summary(assignedTo),
-    queryFn: () => fetchSummary(assignedTo),
+    queryKey: ticketKeys.summary(assigneeUserId),
+    queryFn: () => fetchSummary(assigneeUserId),
   });
 }
 

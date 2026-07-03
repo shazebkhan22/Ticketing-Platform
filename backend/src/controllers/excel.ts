@@ -67,7 +67,7 @@ export async function exportTickets(req: Request, res: Response) {
   const {
     status,
     callType,
-    assignedTo,
+    assigneeUserId,
     assignedBy,
     accountManager,
     priority,
@@ -88,9 +88,11 @@ export async function exportTickets(req: Request, res: Response) {
     params.push(callType);
     conditions.push(`t.call_type = $${params.length}`);
   }
-  if (assignedTo) {
-    params.push(assignedTo);
-    conditions.push(`t.assigned_to = $${params.length}`);
+  if (assigneeUserId) {
+    params.push(parseInt(assigneeUserId, 10));
+    conditions.push(
+      `EXISTS (SELECT 1 FROM ticket_assignees ta WHERE ta.ticket_sr_no = t.sr_no AND ta.user_id = $${params.length})`
+    );
   }
   if (accountManager) {
     params.push(accountManager);
@@ -126,7 +128,10 @@ export async function exportTickets(req: Request, res: Response) {
   const result = await pool.query(
     `SELECT t.*,
       (SELECT string_agg(r.remark_date || ': ' || r.body, E'\\n' ORDER BY r.created_at)
-       FROM remarks r WHERE r.ticket_sr_no = t.sr_no) AS remarks
+       FROM remarks r WHERE r.ticket_sr_no = t.sr_no) AS remarks,
+      (SELECT string_agg(u.display_name, ', ' ORDER BY u.display_name)
+       FROM ticket_assignees ta JOIN users u ON u.id = ta.user_id
+       WHERE ta.ticket_sr_no = t.sr_no) AS assigned_to_names
     FROM tickets t ${whereClause} ORDER BY t.sr_no DESC`,
     params
   );
@@ -152,7 +157,7 @@ export async function exportTickets(req: Request, res: Response) {
       accountManager: row.account_manager,
       assignedBy: row.assigned_by,
       callType: row.call_type,
-      assignedTo: row.assigned_to,
+      assignedTo: row.assigned_to_names ?? "",
       priority: row.priority,
       deadlineDate: row.deadline_date,
       status: row.status,
@@ -259,6 +264,8 @@ const importRowSchema = z.object({
   accountManager: z.string().min(1, "Account Manager is required"),
   assignedBy: z.string().min(1, "Assigned By is required"),
   callType: z.enum(CALL_TYPES),
+  // Comma-separated list of employee display names, e.g. "Pranesh Kute, Jane Doe" —
+  // matches the export format so a re-imported export round-trips unchanged.
   assignedTo: z.string().min(1, "Assigned To is required"),
   priority: z.enum(TICKET_PRIORITIES).optional(),
   deadlineDate: z.string().optional(),
@@ -365,15 +372,22 @@ export async function importTickets(req: Request, res: Response) {
     }
 
     const d = parsed.data;
-    const assignedToUserId = employeeIdByName.get(d.assignedTo.toLowerCase());
-    if (!assignedToUserId) {
+    const assigneeNames = d.assignedTo.split(",").map((s) => s.trim()).filter(Boolean);
+    const unmatchedNames = assigneeNames.filter((name) => !employeeIdByName.has(name.toLowerCase()));
+    if (assigneeNames.length === 0 || unmatchedNames.length > 0) {
       results.push({
         row: rowNumber,
         success: false,
-        error: `"${d.assignedTo}" does not match any platform employee`,
+        error:
+          unmatchedNames.length > 0
+            ? `${unmatchedNames.map((n) => `"${n}"`).join(", ")} does not match any platform employee`
+            : `"Assigned To" must list at least one employee`,
       });
       continue;
     }
+    const assigneeUserIds = [
+      ...new Set(assigneeNames.map((name) => employeeIdByName.get(name.toLowerCase())!)),
+    ];
 
     try {
       const ticketDate = new Date(d.ticketDate);
@@ -385,12 +399,13 @@ export async function importTickets(req: Request, res: Response) {
         emailId: d.emailId,
         address: d.address,
       });
-      await pool.query(
+      const inserted = await pool.query(
         `INSERT INTO tickets (
           ticket_no, ticket_date, mode, customer_id, company_name, contact_name, contact_no, email_id, address,
           model, serial_number, problem, owner_user_id, account_manager, assigned_by, call_type,
-          assigned_to_user_id, assigned_to, priority, deadline_date, status, feedback, internal_tag
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+          priority, deadline_date, status, feedback, internal_tag
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+        RETURNING sr_no`,
         [
           ticketNo,
           d.ticketDate,
@@ -408,14 +423,18 @@ export async function importTickets(req: Request, res: Response) {
           d.accountManager,
           d.assignedBy,
           d.callType,
-          assignedToUserId,
-          d.assignedTo,
           d.priority ?? "P3",
           d.deadlineDate || null,
           d.status ?? "Pending",
           d.feedback || null,
           d.internalTag ?? "External",
         ]
+      );
+      const ticketSrNo = inserted.rows[0].sr_no;
+      const assigneeValues = assigneeUserIds.map((_, i) => `($1, $${i + 2})`).join(", ");
+      await pool.query(
+        `INSERT INTO ticket_assignees (ticket_sr_no, user_id) VALUES ${assigneeValues}`,
+        [ticketSrNo, ...assigneeUserIds]
       );
       results.push({ row: rowNumber, success: true, ticketNo });
     } catch (err) {

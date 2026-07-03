@@ -32,7 +32,7 @@ export interface CustomerTicketSummary {
   status: string;
   priority: string;
   problem: string;
-  assignedTo: string;
+  assignees: { id: number; displayName: string }[];
   deadlineDate: string | null;
   closedAt: string | null;
 }

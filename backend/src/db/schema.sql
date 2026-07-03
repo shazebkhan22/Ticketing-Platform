@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TYPE user_role AS ENUM ('admin', 'employee');
 CREATE TYPE ticket_mode AS ENUM ('Whatsapp', 'Call', 'Mail', 'Verbally');
-CREATE TYPE call_type AS ENUM ('Warranty', 'AMC', 'OEM', 'Office', 'Installation', 'Project', 'Call', 'Chargeable', 'Non-Chargeable');
+CREATE TYPE call_type AS ENUM ('Warranty', 'AMC', 'OEM', 'Office', 'Installation', 'POC', 'Project', 'Call', 'Chargeable', 'Non-Chargeable');
 CREATE TYPE ticket_status AS ENUM ('Pending', 'In Progress', 'Closed');
 CREATE TYPE internal_tag AS ENUM ('Internal', 'External');
 CREATE TYPE ticket_priority AS ENUM ('P1', 'P2', 'P3', 'P4');
@@ -53,8 +53,6 @@ CREATE TABLE tickets (
   account_manager TEXT NOT NULL,
   assigned_by TEXT,
   call_type call_type NOT NULL,
-  assigned_to_user_id INTEGER NOT NULL REFERENCES users(id),
-  assigned_to TEXT NOT NULL,
   priority ticket_priority NOT NULL DEFAULT 'P3',
   -- Manually set target/due date for resolving this ticket — plain field,
   -- no automatic calculation or breach tracking (that was the old SLA
@@ -73,12 +71,23 @@ CREATE INDEX idx_tickets_customer_id ON tickets(customer_id);
 CREATE INDEX idx_tickets_status ON tickets(status);
 CREATE INDEX idx_tickets_priority ON tickets(priority);
 CREATE INDEX idx_tickets_call_type ON tickets(call_type);
-CREATE INDEX idx_tickets_assigned_to ON tickets(assigned_to);
-CREATE INDEX idx_tickets_assigned_to_user_id ON tickets(assigned_to_user_id);
 CREATE INDEX idx_tickets_account_manager ON tickets(account_manager);
 CREATE INDEX idx_tickets_owner_user_id ON tickets(owner_user_id);
 CREATE INDEX idx_tickets_ticket_date ON tickets(ticket_date);
 CREATE INDEX idx_tickets_company_name ON tickets(company_name);
+
+-- Many-to-many: a ticket can have multiple assignees, all of whom get full
+-- edit rights (see requireAssigneeOrAdmin). No denormalized name column —
+-- always join to users for display_name, since this repo already has one
+-- staleness gap from denormalizing names (customers.name copy) and there's
+-- no need to repeat it here.
+CREATE TABLE ticket_assignees (
+  ticket_sr_no INTEGER NOT NULL REFERENCES tickets(sr_no) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  PRIMARY KEY (ticket_sr_no, user_id)
+);
+
+CREATE INDEX idx_ticket_assignees_user_id ON ticket_assignees(user_id);
 
 CREATE TABLE remarks (
   id SERIAL PRIMARY KEY,

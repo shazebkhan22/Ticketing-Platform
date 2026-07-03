@@ -30,14 +30,15 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 /**
- * Allows the request through if the logged-in user is an admin, OR is the
- * employee a ticket is currently ASSIGNED TO (req.params.srNo) — the person
- * actually responsible for resolving it. Everyone else gets 403.
+ * Allows the request through if the logged-in user is an admin, OR is one of
+ * the employees a ticket is currently ASSIGNED TO (req.params.srNo) — a
+ * ticket can have multiple assignees, all of whom are responsible for
+ * resolving it and get equal edit rights. Everyone else gets 403.
  * Read-only routes (GET) should NOT use this — only mutating routes
  * (PUT/PATCH/DELETE/POST remarks) are restricted to assignee-or-admin.
  * Note: this is independent of who created the ticket (tickets.owner_user_id) —
- * a ticket can be created by one employee and assigned to another, and the
- * assignee is who gets edit rights, not the creator.
+ * a ticket can be created by one employee and assigned to others, and the
+ * assignees are who get edit rights, not the creator.
  */
 export async function requireAssigneeOrAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
@@ -48,13 +49,15 @@ export async function requireAssigneeOrAdmin(req: Request, res: Response, next: 
   }
 
   const srNo = parseInt(req.params.srNo, 10);
-  const result = await pool.query("SELECT assigned_to_user_id FROM tickets WHERE sr_no = $1", [
-    srNo,
-  ]);
-  if (result.rows.length === 0) {
+  const ticketResult = await pool.query("SELECT 1 FROM tickets WHERE sr_no = $1", [srNo]);
+  if (ticketResult.rows.length === 0) {
     return res.status(404).json({ error: "Ticket not found" });
   }
-  if (result.rows[0].assigned_to_user_id !== req.session.userId) {
+  const membership = await pool.query(
+    "SELECT 1 FROM ticket_assignees WHERE ticket_sr_no = $1 AND user_id = $2",
+    [srNo, req.session.userId]
+  );
+  if (membership.rows.length === 0) {
     return res.status(403).json({ error: "You can only modify tickets assigned to you" });
   }
   next();

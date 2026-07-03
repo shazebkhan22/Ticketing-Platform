@@ -5,6 +5,7 @@ export type CallType =
   | "OEM"
   | "Office"
   | "Installation"
+  | "POC"
   | "Project"
   | "Call"
   | "Chargeable"
@@ -31,8 +32,7 @@ export interface Ticket {
   accountManager: string;
   assignedBy: string | null;
   callType: CallType;
-  assignedToUserId: number;
-  assignedTo: string;
+  assignees: Employee[];
   priority: TicketPriority;
   deadlineDate: string | null;
   status: TicketStatus;
@@ -68,6 +68,7 @@ export interface Summary {
 export interface Employee {
   id: number;
   displayName: string;
+  role?: "admin" | "employee";
 }
 
 export interface MetaOptions {
@@ -91,7 +92,7 @@ export interface TicketListResponse {
 export interface TicketFilters {
   status?: string;
   callType?: string;
-  assignedTo?: string;
+  assigneeUserId?: number;
   assignedBy?: string;
   accountManager?: string;
   priority?: string;
@@ -129,7 +130,7 @@ export interface TicketFormInput {
   accountManager: string;
   assignedBy: string;
   callType: CallType;
-  assignedToUserId: number;
+  assigneeUserIds: number[];
   priority?: TicketPriority;
   deadlineDate?: string;
   internalTag?: InternalTag;

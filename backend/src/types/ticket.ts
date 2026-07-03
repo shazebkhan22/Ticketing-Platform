@@ -5,6 +5,7 @@ export const CALL_TYPES = [
   "OEM",
   "Office",
   "Installation",
+  "POC",
   "Project",
   "Call",
   "Chargeable",

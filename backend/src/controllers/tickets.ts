@@ -30,10 +30,11 @@ const createTicketSchema = z.object({
   // text just like accountManager, can be anybody, not limited to platform users.
   assignedBy: z.string().min(1),
   callType: z.enum(CALL_TYPES),
-  // Assigned To = which of the 5 platform employees will resolve this ticket.
-  // Stored as a user id (must reference an existing user); edit/delete rights
-  // follow this field, not who created the ticket.
-  assignedToUserId: z.coerce.number().int().positive(),
+  // Assigned To = which of the platform employees will resolve this ticket.
+  // A ticket can have multiple assignees, all of whom get full edit/delete
+  // rights (see requireAssigneeOrAdmin) — this is the actual permission
+  // record, not who created the ticket.
+  assigneeUserIds: z.array(z.coerce.number().int().positive()).min(1, "At least one assignee required"),
   priority: z.enum(TICKET_PRIORITIES).optional(),
   deadlineDate: z.string().optional(),
   internalTag: z.enum(INTERNAL_TAGS).optional(),
@@ -69,8 +70,7 @@ function rowToTicket(row: any) {
     accountManager: row.account_manager,
     assignedBy: row.assigned_by,
     callType: row.call_type,
-    assignedToUserId: row.assigned_to_user_id,
-    assignedTo: row.assigned_to,
+    assignees: row.assignees ?? [],
     priority: row.priority,
     deadlineDate: row.deadline_date,
     status: row.status,
@@ -83,11 +83,23 @@ function rowToTicket(row: any) {
   };
 }
 
+// Aggregates each ticket's assignees into a JSON array of {id, displayName}
+// via a lateral join, so list/detail queries stay "one row per ticket" and
+// can keep using t.* + pagination/ORDER BY without a GROUP BY.
+const ASSIGNEES_LATERAL_JOIN = `
+  LEFT JOIN LATERAL (
+    SELECT json_agg(json_build_object('id', ta.user_id, 'displayName', u.display_name) ORDER BY u.display_name) AS assignees
+    FROM ticket_assignees ta
+    JOIN users u ON u.id = ta.user_id
+    WHERE ta.ticket_sr_no = t.sr_no
+  ) assignee_agg ON true
+`;
+
 export async function listTickets(req: Request, res: Response) {
   const {
     status,
     callType,
-    assignedTo,
+    assigneeUserId,
     assignedBy,
     accountManager,
     priority,
@@ -110,9 +122,11 @@ export async function listTickets(req: Request, res: Response) {
     params.push(callType);
     conditions.push(`t.call_type = $${params.length}`);
   }
-  if (assignedTo) {
-    params.push(assignedTo);
-    conditions.push(`t.assigned_to = $${params.length}`);
+  if (assigneeUserId) {
+    params.push(parseInt(assigneeUserId, 10));
+    conditions.push(
+      `EXISTS (SELECT 1 FROM ticket_assignees ta WHERE ta.ticket_sr_no = t.sr_no AND ta.user_id = $${params.length})`
+    );
   }
   if (accountManager) {
     params.push(accountManager);
@@ -150,10 +164,11 @@ export async function listTickets(req: Request, res: Response) {
   const offset = (Math.max(parseInt(page, 10) || 1, 1) - 1) * limit;
 
   const query = `
-    SELECT t.*, (
+    SELECT t.*, COALESCE(assignee_agg.assignees, '[]'::json) AS assignees, (
       SELECT r.body FROM remarks r WHERE r.ticket_sr_no = t.sr_no ORDER BY r.created_at DESC LIMIT 1
     ) AS last_remark
     FROM tickets t
+    ${ASSIGNEES_LATERAL_JOIN}
     ${whereClause}
     ORDER BY t.sr_no DESC
     LIMIT ${limit} OFFSET ${offset}
@@ -175,9 +190,11 @@ export async function listTickets(req: Request, res: Response) {
 }
 
 export async function getSummary(req: Request, res: Response) {
-  const { assignedTo } = req.query as Record<string, string>;
-  const whereClause = assignedTo ? "WHERE t.assigned_to = $1" : "";
-  const params = assignedTo ? [assignedTo] : [];
+  const { assigneeUserId } = req.query as Record<string, string>;
+  const whereClause = assigneeUserId
+    ? "WHERE EXISTS (SELECT 1 FROM ticket_assignees ta WHERE ta.ticket_sr_no = t.sr_no AND ta.user_id = $1)"
+    : "";
+  const params = assigneeUserId ? [parseInt(assigneeUserId, 10)] : [];
 
   const result = await pool.query(
     `
@@ -204,7 +221,13 @@ export async function getSummary(req: Request, res: Response) {
 
 export async function getTicket(req: Request, res: Response) {
   const srNo = parseInt(req.params.srNo, 10);
-  const result = await pool.query(`SELECT t.* FROM tickets t WHERE t.sr_no = $1`, [srNo]);
+  const result = await pool.query(
+    `SELECT t.*, COALESCE(assignee_agg.assignees, '[]'::json) AS assignees
+     FROM tickets t
+     ${ASSIGNEES_LATERAL_JOIN}
+     WHERE t.sr_no = $1`,
+    [srNo]
+  );
   if (result.rows.length === 0) {
     return res.status(404).json({ error: "Ticket not found" });
   }
@@ -224,6 +247,36 @@ export async function getTicket(req: Request, res: Response) {
   });
 }
 
+// Validates a proposed assignee set against the confirmed permission rule:
+// admins may assign to any mix of admins/employees; non-admins must include
+// themselves and may only add other employees (never an admin).
+async function resolveAssignees(
+  req: Request,
+  ids: number[]
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  const usersResult = await pool.query("SELECT id, role FROM users WHERE id = ANY($1)", [ids]);
+  if (usersResult.rows.length !== new Set(ids).size) {
+    return { ok: false, status: 400, error: "One or more assignees do not reference a valid user" };
+  }
+  if (req.session.role !== "admin") {
+    if (!ids.includes(req.session.userId!)) {
+      return { ok: false, status: 403, error: "You must include yourself as an assignee" };
+    }
+    if (usersResult.rows.some((r) => r.role === "admin")) {
+      return { ok: false, status: 403, error: "Employees cannot assign tickets to an admin" };
+    }
+  }
+  return { ok: true };
+}
+
+async function insertAssignees(ticketSrNo: number, userIds: number[]) {
+  const values = userIds.map((_, i) => `($1, $${i + 2})`).join(", ");
+  await pool.query(`INSERT INTO ticket_assignees (ticket_sr_no, user_id) VALUES ${values}`, [
+    ticketSrNo,
+    ...userIds,
+  ]);
+}
+
 export async function createTicket(req: Request, res: Response) {
   const parsed = createTicketSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -235,26 +288,17 @@ export async function createTicket(req: Request, res: Response) {
     return res.status(400).json({ error: "Deadline cannot be before the ticket date" });
   }
 
+  const assigneeCheck = await resolveAssignees(req, d.assigneeUserIds);
+  if (!assigneeCheck.ok) {
+    return res.status(assigneeCheck.status).json({ error: assigneeCheck.error });
+  }
+
   const ticketDate = new Date(d.ticketDate);
   const ticketNo = await generateTicketNumber(ticketDate);
 
   // owner_user_id is informational (who logged the ticket); it is NOT the
-  // permission basis — that's assigned_to_user_id, resolved below.
+  // permission basis — that's ticket_assignees, resolved above.
   const ownerUserId = req.session.userId;
-
-  // Employees may only assign tickets to themselves; admins can assign to
-  // anyone (including themselves or another admin).
-  if (req.session.role !== "admin" && d.assignedToUserId !== req.session.userId) {
-    return res.status(403).json({ error: "You can only assign tickets to yourself" });
-  }
-
-  const assigneeResult = await pool.query("SELECT display_name FROM users WHERE id = $1", [
-    d.assignedToUserId,
-  ]);
-  if (assigneeResult.rows.length === 0) {
-    return res.status(400).json({ error: "assignedToUserId does not reference a valid user" });
-  }
-  const assignedToName = assigneeResult.rows[0].display_name;
 
   const customerId = await getOrCreateCustomerId({
     companyName: d.companyName,
@@ -268,8 +312,8 @@ export async function createTicket(req: Request, res: Response) {
     `INSERT INTO tickets (
       ticket_no, ticket_date, mode, customer_id, company_name, contact_name, contact_no, email_id, address,
       model, serial_number, problem, owner_user_id, account_manager, assigned_by, call_type,
-      assigned_to_user_id, assigned_to, priority, deadline_date, internal_tag
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+      priority, deadline_date, internal_tag
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
     RETURNING *`,
     [
       ticketNo,
@@ -288,8 +332,6 @@ export async function createTicket(req: Request, res: Response) {
       d.accountManager,
       d.assignedBy,
       d.callType,
-      d.assignedToUserId,
-      assignedToName,
       d.priority ?? "P3",
       d.deadlineDate || null,
       d.internalTag ?? "External",
@@ -297,6 +339,7 @@ export async function createTicket(req: Request, res: Response) {
   );
 
   const ticket = result.rows[0];
+  await insertAssignees(ticket.sr_no, d.assigneeUserIds);
 
   await logActivity({
     actorUserId: req.session.userId,
@@ -306,7 +349,15 @@ export async function createTicket(req: Request, res: Response) {
     ticketNo: ticket.ticket_no,
   });
 
-  res.status(201).json(rowToTicket(ticket));
+  const created = await pool.query(
+    `SELECT t.*, COALESCE(assignee_agg.assignees, '[]'::json) AS assignees
+     FROM tickets t
+     ${ASSIGNEES_LATERAL_JOIN}
+     WHERE t.sr_no = $1`,
+    [ticket.sr_no]
+  );
+
+  res.status(201).json(rowToTicket(created.rows[0]));
 }
 
 export async function updateTicket(req: Request, res: Response) {
@@ -363,24 +414,14 @@ export async function updateTicket(req: Request, res: Response) {
     }
   }
 
-  // Reassigning a ticket updates both the FK and the denormalized display
-  // name together, so they never drift apart.
-  if (d.assignedToUserId !== undefined) {
-    // Employees may only reassign tickets to themselves; admins can assign
-    // to anyone (including themselves or another admin).
-    if (req.session.role !== "admin" && d.assignedToUserId !== req.session.userId) {
-      return res.status(403).json({ error: "You can only assign tickets to yourself" });
+  // Reassigning a ticket replaces the full ticket_assignees set — never
+  // touches the tickets table directly, same as the companyName/customerId
+  // side effect below.
+  if (d.assigneeUserIds !== undefined) {
+    const assigneeCheck = await resolveAssignees(req, d.assigneeUserIds);
+    if (!assigneeCheck.ok) {
+      return res.status(assigneeCheck.status).json({ error: assigneeCheck.error });
     }
-    const assigneeResult = await pool.query("SELECT display_name FROM users WHERE id = $1", [
-      d.assignedToUserId,
-    ]);
-    if (assigneeResult.rows.length === 0) {
-      return res.status(400).json({ error: "assignedToUserId does not reference a valid user" });
-    }
-    params.push(d.assignedToUserId);
-    setClauses.push(`assigned_to_user_id = $${params.length}`);
-    params.push(assigneeResult.rows[0].display_name);
-    setClauses.push(`assigned_to = $${params.length}`);
   }
 
   // Editing the company name re-links to (or creates) the matching customer
@@ -397,24 +438,32 @@ export async function updateTicket(req: Request, res: Response) {
     setClauses.push(`customer_id = $${params.length}`);
   }
 
-  if (setClauses.length === 0) {
+  if (setClauses.length === 0 && d.assigneeUserIds === undefined) {
     return res.status(400).json({ error: "No fields to update" });
   }
 
-  params.push(srNo);
-  const result = await pool.query(
-    `UPDATE tickets SET ${setClauses.join(", ")} WHERE sr_no = $${params.length} RETURNING *`,
-    params
-  );
-
-  if (result.rows.length === 0) {
-    return res.status(404).json({ error: "Ticket not found" });
+  let ticket;
+  if (setClauses.length > 0) {
+    params.push(srNo);
+    const result = await pool.query(
+      `UPDATE tickets SET ${setClauses.join(", ")} WHERE sr_no = $${params.length} RETURNING *`,
+      params
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+    ticket = result.rows[0];
+  } else {
+    const existing = await pool.query("SELECT * FROM tickets WHERE sr_no = $1", [srNo]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+    ticket = existing.rows[0];
   }
 
-  const ticket = result.rows[0];
-  const changedFields = Object.keys(d);
-  if (d.assignedToUserId !== undefined) {
-    changedFields.push("assignedTo");
+  if (d.assigneeUserIds !== undefined) {
+    await pool.query("DELETE FROM ticket_assignees WHERE ticket_sr_no = $1", [srNo]);
+    await insertAssignees(srNo, d.assigneeUserIds);
   }
 
   await logActivity({
@@ -426,7 +475,15 @@ export async function updateTicket(req: Request, res: Response) {
     details: `Changes in ticket`,
   });
 
-  res.json(rowToTicket(ticket));
+  const updated = await pool.query(
+    `SELECT t.*, COALESCE(assignee_agg.assignees, '[]'::json) AS assignees
+     FROM tickets t
+     ${ASSIGNEES_LATERAL_JOIN}
+     WHERE t.sr_no = $1`,
+    [srNo]
+  );
+
+  res.json(rowToTicket(updated.rows[0]));
 }
 
 export async function updateTicketStatus(req: Request, res: Response) {

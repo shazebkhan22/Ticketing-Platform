@@ -86,7 +86,9 @@ export function CustomerDetailPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="max-w-xs truncate text-sm text-neutral-500">{t.problem}</TableCell>
-                    <TableCell className="text-sm">{t.assignedTo}</TableCell>
+                    <TableCell className="text-sm">
+                      {t.assignees.map((a) => a.displayName).join(", ")}
+                    </TableCell>
                     <TableCell className="text-sm text-neutral-500">
                       {t.deadlineDate ? formatDate(t.deadlineDate) : "—"}
                     </TableCell>

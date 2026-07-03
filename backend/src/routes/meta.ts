@@ -14,11 +14,13 @@ export const metaRouter = Router();
 metaRouter.use(requireAuth);
 
 metaRouter.get("/options", async (_req, res) => {
-  // "Assigned To" must be one of the 5 platform employees (the engineers who
-  // actually resolve tickets) — the frontend uses {id, displayName} so the
-  // form can submit assignedToUserId while showing a readable name.
+  // "Assigned To" must be one of the platform employees (the engineers who
+  // actually resolve tickets) — the frontend uses {id, displayName, role} so
+  // the form can submit assigneeUserIds while showing readable names, and
+  // filter which employees a non-admin is allowed to add as a co-assignee
+  // (see resolveAssignees in controllers/tickets.ts for the matching rule).
   const employeesResult = await pool.query(
-    "SELECT id, display_name FROM users ORDER BY display_name"
+    "SELECT id, display_name, role FROM users ORDER BY display_name"
   );
 
   // "Account Manager" is free text (anybody in the office could have reported
@@ -46,6 +48,7 @@ metaRouter.get("/options", async (_req, res) => {
     assignedToOptions: employeesResult.rows.map((r) => ({
       id: r.id,
       displayName: r.display_name,
+      role: r.role,
     })),
   });
 });

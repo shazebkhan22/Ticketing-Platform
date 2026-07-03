@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Combobox } from "@/components/ui/combobox";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -49,7 +50,7 @@ const EMPTY_FORM: TicketFormValues = {
   accountManager: "",
   assignedBy: "",
   callType: "Call",
-  assignedToUserId: 0,
+  assigneeUserIds: [],
   priority: "P3",
   deadlineDate: "",
   internalTag: "External",
@@ -70,7 +71,7 @@ function ticketToFormValues(ticket: TicketDetail["ticket"]): TicketFormValues {
     accountManager: ticket.accountManager,
     assignedBy: ticket.assignedBy ?? "",
     callType: ticket.callType,
-    assignedToUserId: ticket.assignedToUserId,
+    assigneeUserIds: ticket.assignees.map((a) => a.id),
     priority: ticket.priority,
     deadlineDate: ticket.deadlineDate?.slice(0, 10) ?? "",
     internalTag: ticket.internalTag,
@@ -90,11 +91,11 @@ export function TicketFormPage() {
   const createTicketMutation = useCreateTicket();
   const updateTicketMutation = useUpdateTicket(ticketSrNo);
 
-  // Employees can only ever assign to themselves (enforced again on the
-  // backend) — a new ticket should default to that instead of an empty
-  // picker, since there's nothing else for them to choose.
+  // Employees must always include themselves as an assignee (enforced again
+  // on the backend) — a new ticket should default to that instead of an
+  // empty picker, since it's always part of the final set either way.
   const emptyFormForUser = useMemo(
-    () => (!isAdmin && user ? { ...EMPTY_FORM, assignedToUserId: user.id } : EMPTY_FORM),
+    () => (!isAdmin && user ? { ...EMPTY_FORM, assigneeUserIds: [user.id] } : EMPTY_FORM),
     [isAdmin, user]
   );
 
@@ -377,23 +378,24 @@ export function TicketFormPage() {
 
             <FormField
               control={form.control}
-              name="assignedToUserId"
+              name="assigneeUserIds"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Assigned To *</FormLabel>
                   <FormControl>
-                    <Combobox
-                      value={field.value ? String(field.value) : ""}
-                      onChange={(v) => field.onChange(Number(v))}
-                      disabled={!isAdmin}
+                    <MultiSelect
+                      value={field.value.map(String)}
+                      onChange={(vals) => field.onChange(vals.map(Number))}
                       options={(isAdmin
                         ? options.assignedToOptions
-                        : options.assignedToOptions.filter((emp) => emp.id === user?.id)
+                        : options.assignedToOptions.filter(
+                            (emp) => emp.id === user?.id || emp.role === "employee"
+                          )
                       ).map((emp) => ({
                         value: String(emp.id),
                         label: emp.displayName,
                       }))}
-                      placeholder="Select an employee"
+                      placeholder="Select employees"
                       searchPlaceholder="Search employees..."
                       emptyText="No employee found."
                     />

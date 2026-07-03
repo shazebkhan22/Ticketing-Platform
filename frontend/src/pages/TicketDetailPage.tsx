@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 
 function Field({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -60,7 +61,7 @@ export function TicketDetailPage() {
   const { ticket, remarks } = data;
   const feedbackValue = feedback ?? ticket.feedback ?? "";
   const currentStatusIndex = STATUS_FLOW.indexOf(ticket.status);
-  const canEdit = user?.role === "admin" || user?.id === ticket.assignedToUserId;
+  const canEdit = user?.role === "admin" || ticket.assignees.some((a) => a.id === user?.id);
 
   async function handleAddRemark() {
     const parsed = remarkSchema.safeParse(newRemark);
@@ -143,7 +144,22 @@ export function TicketDetailPage() {
             <Field label="Account Manager" value={ticket.accountManager} />
             <Field label="Assigned By" value={ticket.assignedBy} />
             <Field label="Call Type" value={ticket.callType} />
-            <Field label="Assigned To" value={ticket.assignedTo} />
+            <div>
+              <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                Assigned To
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {ticket.assignees.length > 0 ? (
+                  ticket.assignees.map((a) => (
+                    <Badge key={a.id} variant="secondary">
+                      {a.displayName}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-sm text-neutral-800">-</span>
+                )}
+              </div>
+            </div>
             <Field label="Priority" value={ticket.priority} />
             <Field
               label="Deadline"
