@@ -119,6 +119,24 @@ export async function upsertInventory(req: Request, res: Response) {
   }
   const d = parsed.data;
 
+  if (d.outwardDate && !d.inwardDate) {
+    return res.status(400).json({ error: "Inward date is required before setting an outward date" });
+  }
+  if (d.inwardDate && d.outwardDate && d.outwardDate < d.inwardDate) {
+    return res.status(400).json({ error: "Outward date cannot be before inward date" });
+  }
+  if (d.repairLocation === "Outsourced") {
+    if (!d.outsourceVendor?.trim()) {
+      return res.status(400).json({ error: "Repair center name is required for outsourced repairs" });
+    }
+    if (!d.expectedReturnDate) {
+      return res.status(400).json({ error: "Expected return date is required for outsourced repairs" });
+    }
+  }
+  if (d.outwardDate && d.expectedReturnDate && d.expectedReturnDate >= d.outwardDate) {
+    return res.status(400).json({ error: "Expected return date must be before the outward date" });
+  }
+
   const ticketResult = await pool.query("SELECT sr_no FROM tickets WHERE sr_no = $1", [srNo]);
   if (ticketResult.rows.length === 0) {
     return res.status(404).json({ error: "Ticket not found" });

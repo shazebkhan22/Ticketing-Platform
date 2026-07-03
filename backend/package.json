@@ -20,7 +20,7 @@
     "express-session": "^1.18.0",
     "multer": "^2.2.0",
     "node-cron": "^3.0.3",
-    "nodemailer": "^6.9.14",
+    "nodemailer": "^9.0.3",
     "pg": "^8.12.0",
     "zod": "^3.23.8"
   },
@@ -37,5 +37,9 @@
     "@types/pg": "^8.11.6",
     "tsx": "^4.16.2",
     "typescript": "^5.5.3"
+  },
+  "overrides": {
+    "tar": "^7.5.11",
+    "uuid": "^11.1.1"
   }
 }

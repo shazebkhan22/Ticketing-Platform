@@ -73,8 +73,34 @@ export function InventoryPage() {
     setForm(toFormState(item));
   }
 
+  function validateForm(f: EditFormState): string | null {
+    if (f.outwardDate && !f.inwardDate) {
+      return "Inward date is required before setting an outward date";
+    }
+    if (f.inwardDate && f.outwardDate && f.outwardDate < f.inwardDate) {
+      return "Outward date cannot be before inward date";
+    }
+    if (f.repairLocation === "Outsourced") {
+      if (!f.outsourceVendor.trim()) {
+        return "Repair center name is required for outsourced repairs";
+      }
+      if (!f.expectedReturnDate) {
+        return "Expected return date is required for outsourced repairs";
+      }
+    }
+    if (f.outwardDate && f.expectedReturnDate && f.expectedReturnDate >= f.outwardDate) {
+      return "Expected return date must be before the outward date";
+    }
+    return null;
+  }
+
   async function handleSave() {
     if (!editingItem || !form) return;
+    const validationError = validateForm(form);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
     try {
       await updateMutation.mutateAsync({
         srNo: editingItem.srNo,
@@ -314,7 +340,13 @@ export function InventoryPage() {
                     value={form.outwardDate}
                     onChange={(v) => setForm({ ...form, outwardDate: v })}
                     placeholder="Not dispatched yet"
+                    disabled={!form.inwardDate}
                   />
+                  {!form.inwardDate && (
+                    <p className="mt-1 text-xs text-neutral-400">
+                      Set an inward date before setting the outward date.
+                    </p>
+                  )}
                 </div>
             </div>
           )}
