@@ -230,6 +230,11 @@ export async function createTicket(req: Request, res: Response) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
   const d = parsed.data;
+
+  if (d.deadlineDate && d.deadlineDate < d.ticketDate) {
+    return res.status(400).json({ error: "Deadline cannot be before the ticket date" });
+  }
+
   const ticketDate = new Date(d.ticketDate);
   const ticketNo = await generateTicketNumber(ticketDate);
 
@@ -311,6 +316,20 @@ export async function updateTicket(req: Request, res: Response) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
   const d = parsed.data;
+
+  if (d.ticketDate !== undefined || d.deadlineDate !== undefined) {
+    const existing = await pool.query("SELECT ticket_date, deadline_date FROM tickets WHERE sr_no = $1", [
+      srNo,
+    ]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+    const effectiveTicketDate = d.ticketDate ?? existing.rows[0].ticket_date;
+    const effectiveDeadlineDate = d.deadlineDate ?? existing.rows[0].deadline_date;
+    if (effectiveDeadlineDate && effectiveTicketDate && effectiveDeadlineDate < effectiveTicketDate) {
+      return res.status(400).json({ error: "Deadline cannot be before the ticket date" });
+    }
+  }
 
   const fieldMap: Record<string, string> = {
     ticketDate: "ticket_date",
@@ -455,6 +474,9 @@ export async function updateFeedback(req: Request, res: Response) {
   const existing = await pool.query("SELECT status FROM tickets WHERE sr_no = $1", [srNo]);
   if (existing.rows.length === 0) {
     return res.status(404).json({ error: "Ticket not found" });
+  }
+  if (existing.rows[0].status !== "Closed") {
+    return res.status(400).json({ error: "Feedback can only be added once the ticket is Closed" });
   }
 
   const result = await pool.query(

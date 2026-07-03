@@ -133,8 +133,8 @@ export async function upsertInventory(req: Request, res: Response) {
       return res.status(400).json({ error: "Expected return date is required for outsourced repairs" });
     }
   }
-  if (d.outwardDate && d.expectedReturnDate && d.expectedReturnDate >= d.outwardDate) {
-    return res.status(400).json({ error: "Expected return date must be before the outward date" });
+  if (d.outwardDate && d.expectedReturnDate && d.expectedReturnDate > d.outwardDate) {
+    return res.status(400).json({ error: "Expected return date cannot be after the outward date" });
   }
 
   const ticketResult = await pool.query("SELECT sr_no FROM tickets WHERE sr_no = $1", [srNo]);

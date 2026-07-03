@@ -6,25 +6,30 @@ export const loginSchema = z.object({
 });
 export type LoginFormValues = z.infer<typeof loginSchema>;
 
-export const ticketFormSchema = z.object({
-  ticketDate: z.string().min(1, "Required"),
-  mode: z.string().min(1, "Required"),
-  companyName: z.string().min(1, "Required"),
-  contactName: z.string().min(1, "Required"),
-  contactNo: z.string().min(1, "Required"),
-  emailId: z.string().min(1, "Required").email({ message: "Invalid email" }),
-  address: z.string().min(1, "Required"),
-  model: z.string().optional(),
-  serialNumber: z.string().optional(),
-  problem: z.string().min(1, "Required"),
-  accountManager: z.string().min(1, "Required"),
-  assignedBy: z.string().min(1, "Required"),
-  callType: z.string().min(1, "Required"),
-  assignedToUserId: z.number().int().positive("Select an employee"),
-  priority: z.string().min(1, "Required"),
-  deadlineDate: z.string().optional(),
-  internalTag: z.string().optional(),
-});
+export const ticketFormSchema = z
+  .object({
+    ticketDate: z.string().min(1, "Required"),
+    mode: z.string().min(1, "Required"),
+    companyName: z.string().min(1, "Required"),
+    contactName: z.string().min(1, "Required"),
+    contactNo: z.string().min(1, "Required"),
+    emailId: z.string().min(1, "Required").email({ message: "Invalid email" }),
+    address: z.string().min(1, "Required"),
+    model: z.string().optional(),
+    serialNumber: z.string().optional(),
+    problem: z.string().min(1, "Required"),
+    accountManager: z.string().min(1, "Required"),
+    assignedBy: z.string().min(1, "Required"),
+    callType: z.string().min(1, "Required"),
+    assignedToUserId: z.number().int().positive("Select an employee"),
+    priority: z.string().min(1, "Required"),
+    deadlineDate: z.string().optional(),
+    internalTag: z.string().optional(),
+  })
+  .refine((data) => !data.deadlineDate || data.deadlineDate >= data.ticketDate, {
+    message: "Deadline cannot be before the ticket date",
+    path: ["deadlineDate"],
+  });
 export type TicketFormValues = z.infer<typeof ticketFormSchema>;
 
 export const profileDetailsSchema = z.object({

@@ -2,10 +2,24 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useInventoryList, useUpdateInventory } from "@/hooks/useInventory";
-import type { InventoryFilters, InventoryItem, RepairLocation, EditFormState } from "@/types/inventory";
+import type {
+  InventoryFilters,
+  InventoryItem,
+  RepairLocation,
+  EditFormState,
+} from "@/types/inventory";
 import { formatDate, truncateChars } from "@/lib/ticket-utils";
-import { ALL_FILTER_VALUE, STATUS_CLASSES, DEFAULT_FILTERS, DATE_TOOLTIPS } from "@/constants/inventory";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  ALL_FILTER_VALUE,
+  STATUS_CLASSES,
+  DEFAULT_FILTERS,
+  DATE_TOOLTIPS,
+} from "@/constants/inventory";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,7 +74,10 @@ export function InventoryPage() {
   const page = filters.page ?? 1;
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
 
-  function updateFilter<K extends keyof InventoryFilters>(key: K, value: InventoryFilters[K]) {
+  function updateFilter<K extends keyof InventoryFilters>(
+    key: K,
+    value: InventoryFilters[K]
+  ) {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
@@ -88,8 +105,12 @@ export function InventoryPage() {
         return "Expected return date is required for outsourced repairs";
       }
     }
-    if (f.outwardDate && f.expectedReturnDate && f.expectedReturnDate >= f.outwardDate) {
-      return "Expected return date must be before the outward date";
+    if (
+      f.outwardDate &&
+      f.expectedReturnDate &&
+      f.expectedReturnDate > f.outwardDate
+    ) {
+      return "Expected return date cannot be after the outward date";
     }
     return null;
   }
@@ -125,8 +146,8 @@ export function InventoryPage() {
       <div>
         <h2 className="text-lg font-semibold text-neutral-800">Inventory</h2>
         <p className="text-sm text-neutral-500">
-          Track inward/outward movement and in-house vs. outsourced repair status for every
-          product that's come in on a ticket.
+          Track inward/outward movement and in-house vs. outsourced repair
+          status for every product that's come in on a ticket.
         </p>
       </div>
 
@@ -139,7 +160,12 @@ export function InventoryPage() {
         />
         <Select
           value={filters.repairLocation ?? ALL_FILTER_VALUE}
-          onValueChange={(v) => updateFilter("repairLocation", v === ALL_FILTER_VALUE ? undefined : v)}
+          onValueChange={(v) =>
+            updateFilter(
+              "repairLocation",
+              v === ALL_FILTER_VALUE ? undefined : v
+            )
+          }
         >
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Repair location" />
@@ -172,33 +198,50 @@ export function InventoryPage() {
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={10} className="py-3 text-center text-neutral-400">
+                  <TableCell
+                    colSpan={10}
+                    className="py-3 text-center text-neutral-400"
+                  >
                     <Skeleton className="h-6 w-full" />
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && items.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={10} className="py-3 text-center text-neutral-400">
-                    No products found. Inventory only tracks tickets that have a serial number.
+                  <TableCell
+                    colSpan={10}
+                    className="py-3 text-center text-neutral-400"
+                  >
+                    No products found. Inventory only tracks tickets that have a
+                    serial number.
                   </TableCell>
                 </TableRow>
               )}
               {items.map((item) => (
                 <TableRow key={item.srNo}>
                   <TableCell className="text-sm font-medium">
-                    <Link to={`/tickets/${item.srNo}`} className="text-blue-800 hover:underline">
+                    <Link
+                      to={`/tickets/${item.srNo}`}
+                      className="text-blue-800 hover:underline"
+                    >
                       {item.ticketNo}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-sm">{truncateChars(item.companyName,8)}</TableCell>
-                  <TableCell className="text-sm text-neutral-500">{truncateChars(item.model ?? "",19)}</TableCell>
+                  <TableCell className="text-sm">
+                    {truncateChars(item.companyName, 8)}
+                  </TableCell>
+                  <TableCell className="text-sm text-neutral-500">
+                    {truncateChars(item.model ?? "", 19)}
+                  </TableCell>
                   <TableCell className="text-sm text-neutral-500">
                     {truncateChars(item.serialNumber ?? "", 8) || "-"}
                   </TableCell>
                   <TableCell className="text-sm">{item.quantity}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className={STATUS_CLASSES[item.derivedStatus]}>
+                    <Badge
+                      variant="secondary"
+                      className={STATUS_CLASSES[item.derivedStatus]}
+                    >
                       {item.derivedStatus}
                     </Badge>
                   </TableCell>
@@ -209,7 +252,11 @@ export function InventoryPage() {
                     {item.outwardDate ? formatDate(item.outwardDate) : "-"}
                   </TableCell>
                   <TableCell>
-                    <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openEdit(item)}
+                    >
                       Update
                     </Button>
                   </TableCell>
@@ -258,26 +305,30 @@ export function InventoryPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update Inventory — {editingItem?.ticketNo}</DialogTitle>
+            <DialogTitle>
+              Update Inventory — {editingItem?.ticketNo}
+            </DialogTitle>
           </DialogHeader>
 
           {form && (
             <div className="space-y-4">
               <div className="gap-3">
-                  <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-neutral-500">
-                    Inward Date
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3.5 w-3.5 cursor-help text-primary" />
-                      </TooltipTrigger>
-                      <TooltipContent>{DATE_TOOLTIPS["Inward Date"]}</TooltipContent>
-                    </Tooltip>
-                  </label>
-                  <DatePicker
-                    value={form.inwardDate}
-                    onChange={(v) => setForm({ ...form, inwardDate: v })}
-                    placeholder="Not received yet"
-                  />       
+                <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-neutral-500">
+                  Inward Date
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-3.5 w-3.5 cursor-help text-primary" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {DATE_TOOLTIPS["Inward Date"]}
+                    </TooltipContent>
+                  </Tooltip>
+                </label>
+                <DatePicker
+                  value={form.inwardDate}
+                  onChange={(v) => setForm({ ...form, inwardDate: v })}
+                  placeholder="Not received yet"
+                />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-neutral-500">
@@ -285,7 +336,9 @@ export function InventoryPage() {
                 </label>
                 <Select
                   value={form.repairLocation}
-                  onValueChange={(v) => setForm({ ...form, repairLocation: v as RepairLocation })}
+                  onValueChange={(v) =>
+                    setForm({ ...form, repairLocation: v as RepairLocation })
+                  }
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -304,7 +357,9 @@ export function InventoryPage() {
                     </label>
                     <Input
                       value={form.outsourceVendor}
-                      onChange={(e) => setForm({ ...form, outsourceVendor: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, outsourceVendor: e.target.value })
+                      }
                       placeholder="e.g. ABC Repair Center"
                     />
                   </div>
@@ -315,39 +370,45 @@ export function InventoryPage() {
                         <TooltipTrigger asChild>
                           <Info className="h-3.5 w-3.5 cursor-help text-primary" />
                         </TooltipTrigger>
-                        <TooltipContent>{DATE_TOOLTIPS["Expected Return Date"]}</TooltipContent>
+                        <TooltipContent>
+                          {DATE_TOOLTIPS["Expected Return Date"]}
+                        </TooltipContent>
                       </Tooltip>
                     </label>
                     <DatePicker
                       value={form.expectedReturnDate}
-                      onChange={(v) => setForm({ ...form, expectedReturnDate: v })}
+                      onChange={(v) =>
+                        setForm({ ...form, expectedReturnDate: v })
+                      }
                       placeholder="Not set"
                     />
                   </div>
                 </div>
               )}
-                                <div>
-                  <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-neutral-500">
-                    Outward Date
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3.5 w-3.5 cursor-help text-primary" />
-                      </TooltipTrigger>
-                      <TooltipContent>{DATE_TOOLTIPS["Outward Date"]}</TooltipContent>
-                    </Tooltip>
-                  </label>
-                  <DatePicker
-                    value={form.outwardDate}
-                    onChange={(v) => setForm({ ...form, outwardDate: v })}
-                    placeholder="Not dispatched yet"
-                    disabled={!form.inwardDate}
-                  />
-                  {!form.inwardDate && (
-                    <p className="mt-1 text-xs text-neutral-400">
-                      Set an inward date before setting the outward date.
-                    </p>
-                  )}
-                </div>
+              <div>
+                <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-neutral-500">
+                  Outward Date
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-3.5 w-3.5 cursor-help text-primary" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {DATE_TOOLTIPS["Outward Date"]}
+                    </TooltipContent>
+                  </Tooltip>
+                </label>
+                <DatePicker
+                  value={form.outwardDate}
+                  onChange={(v) => setForm({ ...form, outwardDate: v })}
+                  placeholder="Not dispatched yet"
+                  disabled={!form.inwardDate}
+                />
+                {!form.inwardDate && (
+                  <p className="mt-1 text-xs text-neutral-400">
+                    Set an inward date before setting the outward date.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
