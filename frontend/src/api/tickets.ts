@@ -1,5 +1,6 @@
 import { apiClient } from "./client";
 import type {
+  Analytics,
   ImportResult,
   MetaOptions,
   Summary,
@@ -102,6 +103,11 @@ export async function addRemark(
   remarkDate?: string
 ): Promise<void> {
   await apiClient.post(`/tickets/${srNo}/remarks`, { body, remarkDate });
+}
+
+export async function fetchAnalytics(): Promise<Analytics> {
+  const { data } = await apiClient.get<Analytics>("/tickets/analytics");
+  return data;
 }
 
 export async function fetchMetaOptions(): Promise<MetaOptions> {

@@ -11,6 +11,7 @@ import {
   updateFeedback,
   deleteTicket,
   addRemark,
+  getAnalytics,
 } from "../controllers/tickets";
 import { exportTickets, downloadImportTemplate, importTickets } from "../controllers/excel";
 
@@ -25,6 +26,7 @@ ticketsRouter.use(requireAuth);
 
 // Read routes: any authenticated user (admin or employee) can see all tickets.
 ticketsRouter.get("/summary", getSummary);
+ticketsRouter.get("/analytics", getAnalytics);
 
 // Excel export/import — declared before "/:srNo" so they aren't swallowed by
 // that wildcard param route. Export honors the same filters as the list

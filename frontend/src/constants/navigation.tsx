@@ -20,6 +20,7 @@ export const NAV_ADMIN = [
   { title: "Activity Log", url: "/activity", icon: <HistoryIcon /> },
   { title: "Customers", url: "/customers", icon: <BuildingIcon /> },
   {title: "Inventory", url: "/inventory", icon: <ListChecksIcon />},
+  { title: "Analytics", url: "/analytics", icon: <LayoutDashboardIcon /> },
 ];
 
 export const NAV_SECONDARY = [

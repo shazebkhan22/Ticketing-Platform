@@ -5,6 +5,7 @@ import {
   deleteTicket,
   downloadImportTemplate,
   exportTickets,
+  fetchAnalytics,
   fetchMetaOptions,
   fetchSummary,
   fetchTicket,
@@ -22,12 +23,20 @@ export const ticketKeys = {
   list: (filters: TicketFilters) => [...ticketKeys.all, "list", filters] as const,
   detail: (srNo: number) => [...ticketKeys.all, "detail", srNo] as const,
   meta: () => ["meta", "options"] as const,
+  analytics: () => [...ticketKeys.all, "analytics"] as const,
 };
 
 export function useSummary(assigneeUserId?: number) {
   return useQuery({
     queryKey: ticketKeys.summary(assigneeUserId),
     queryFn: () => fetchSummary(assigneeUserId),
+  });
+}
+
+export function useAnalytics() {
+  return useQuery({
+    queryKey: ticketKeys.analytics(),
+    queryFn: fetchAnalytics,
   });
 }
 

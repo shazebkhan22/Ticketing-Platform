@@ -65,6 +65,30 @@ export interface Summary {
   overdue: number;
 }
 
+export interface AnalyticsMonthlyPoint {
+  month: string;
+  created: number;
+  closed: number;
+}
+
+export interface AnalyticsCallTypeCount {
+  callType: string;
+  count: number;
+}
+
+export interface AnalyticsEmployeeStatus {
+  employee: string;
+  pending: number;
+  inProgress: number;
+  closed: number;
+}
+
+export interface Analytics {
+  monthly: AnalyticsMonthlyPoint[];
+  byCallType: AnalyticsCallTypeCount[];
+  byEmployee: AnalyticsEmployeeStatus[];
+}
+
 export interface Employee {
   id: number;
   displayName: string;

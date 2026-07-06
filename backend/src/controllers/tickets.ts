@@ -611,3 +611,70 @@ export async function addRemark(req: Request, res: Response) {
     createdAt: result.rows[0].created_at,
   });
 }
+
+// Monthly created-vs-closed counts for the last 6 calendar months, plus a
+// breakdown by call type — feeds the Analytics page charts.
+export async function getAnalytics(_req: Request, res: Response) {
+  const monthlyResult = await pool.query(`
+    SELECT
+      TO_CHAR(m.month, 'Mon YYYY') AS month,
+      COALESCE(created.count, 0) AS created,
+      COALESCE(closed.count, 0) AS closed
+    FROM generate_series(
+      date_trunc('month', CURRENT_DATE) - interval '5 months',
+      date_trunc('month', CURRENT_DATE),
+      interval '1 month'
+    ) AS m(month)
+    LEFT JOIN (
+      SELECT date_trunc('month', ticket_date) AS month, COUNT(*) AS count
+      FROM tickets
+      WHERE ticket_date >= date_trunc('month', CURRENT_DATE) - interval '5 months'
+      GROUP BY 1
+    ) created ON created.month = m.month
+    LEFT JOIN (
+      SELECT date_trunc('month', closed_at) AS month, COUNT(*) AS count
+      FROM tickets
+      WHERE closed_at IS NOT NULL AND closed_at >= date_trunc('month', CURRENT_DATE) - interval '5 months'
+      GROUP BY 1
+    ) closed ON closed.month = m.month
+    ORDER BY m.month
+  `);
+
+  const callTypeResult = await pool.query(`
+    SELECT call_type, COUNT(*) AS count
+    FROM tickets
+    GROUP BY call_type
+    ORDER BY count DESC
+  `);
+
+  const employeeResult = await pool.query(`
+    SELECT
+      u.display_name AS employee,
+      COUNT(*) FILTER (WHERE t.status = 'Pending') AS pending,
+      COUNT(*) FILTER (WHERE t.status = 'In Progress') AS in_progress,
+      COUNT(*) FILTER (WHERE t.status = 'Closed') AS closed
+    FROM users u
+    JOIN ticket_assignees ta ON ta.user_id = u.id
+    JOIN tickets t ON t.sr_no = ta.ticket_sr_no
+    GROUP BY u.id, u.display_name
+    ORDER BY u.display_name
+  `);
+
+  res.json({
+    monthly: monthlyResult.rows.map((r) => ({
+      month: r.month,
+      created: parseInt(r.created, 10),
+      closed: parseInt(r.closed, 10),
+    })),
+    byCallType: callTypeResult.rows.map((r) => ({
+      callType: r.call_type,
+      count: parseInt(r.count, 10),
+    })),
+    byEmployee: employeeResult.rows.map((r) => ({
+      employee: r.employee,
+      pending: parseInt(r.pending, 10),
+      inProgress: parseInt(r.in_progress, 10),
+      closed: parseInt(r.closed, 10),
+    })),
+  });
+}

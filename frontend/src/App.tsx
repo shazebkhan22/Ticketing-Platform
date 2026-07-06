@@ -8,7 +8,6 @@ import { SidebarLayout } from "@/components/SidebarLayout";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
-// import { AnalyticsPage } from "./pages/AnalyticsPage";
 
 const LoginPage = lazy(() => import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage })));
 const DashboardPage = lazy(() =>
@@ -34,6 +33,9 @@ const CustomerDetailPage = lazy(() =>
 );
 const InventoryPage = lazy(() =>
   import("@/pages/InventoryPage").then((m) => ({ default: m.InventoryPage }))
+);
+const AnalyticsPage = lazy(() =>
+  import("@/pages/AnalyticsPage").then((m) => ({ default: m.AnalyticsPage }))
 );
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -74,7 +76,7 @@ function App() {
                     <Route path="/customers" element={<CustomersPage />} />
                     <Route path="/customers/:id" element={<CustomerDetailPage />} />
                     <Route path="/inventory" element={<InventoryPage />} />
-                    {/* <Route path="/analytics" element={<AnalyticsPage />} /> */}
+                    <Route path="/analytics" element={<AnalyticsPage />} />
                   </Route>
                 </Route>
               </Route>
