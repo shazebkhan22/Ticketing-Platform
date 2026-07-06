@@ -5,7 +5,7 @@ import {
   PlusCircleIcon,
   HistoryIcon,
   BuildingIcon,
-  // Settings,
+  SettingsIcon,
 } from "lucide-react";
 
 export const NAV_MAIN = [
@@ -21,8 +21,8 @@ export const NAV_ADMIN = [
   { title: "Customers", url: "/customers", icon: <BuildingIcon /> },
   {title: "Inventory", url: "/inventory", icon: <ListChecksIcon />},
   { title: "Analytics", url: "/analytics", icon: <LayoutDashboardIcon /> },
+  { title: "Settings", url: "/settings", icon: <SettingsIcon /> },
 ];
 
 export const NAV_SECONDARY = [
-  // {title : "Settings", url: "/settings", icon: <Settings />},
 ];

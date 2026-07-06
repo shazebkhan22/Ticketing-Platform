@@ -138,7 +138,7 @@ export function TicketFormPage() {
 
   if (optionsLoading || !options || (isEdit && ticketLoading)) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4">
+      <div className="mx-auto space-y-4">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-96 w-full" />
       </div>
@@ -413,6 +413,7 @@ export function TicketFormPage() {
                   <FormLabel>Deadline Date</FormLabel>
                   <FormControl>
                     <DatePicker
+                      disabled={isEdit}
                       value={field.value}
                       onChange={field.onChange}
                       placeholder="No deadline"

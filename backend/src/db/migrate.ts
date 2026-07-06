@@ -100,6 +100,24 @@ const ADDITIVE_MIGRATIONS = [
        ALTER TABLE tickets DROP COLUMN assigned_to;
      END IF;
    END $$`,
+  // Outward-date email notification + customer feedback form (public,
+  // tokenized link emailed 24h after a ticket closes).
+  `CREATE TABLE IF NOT EXISTS smtp_config (
+    id SMALLINT PRIMARY KEY DEFAULT 1,
+    host TEXT,
+    port INTEGER,
+    username TEXT,
+    password TEXT,
+    from_address TEXT,
+    secure BOOLEAN NOT NULL DEFAULT false,
+    CONSTRAINT smtp_config_singleton CHECK (id = 1)
+  )`,
+  `ALTER TABLE ticket_inventory ADD COLUMN IF NOT EXISTS outward_notified_at TIMESTAMPTZ`,
+  `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS feedback_token TEXT UNIQUE`,
+  `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS feedback_requested_at TIMESTAMPTZ`,
+  `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS customer_feedback_rating SMALLINT`,
+  `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS customer_feedback_comment TEXT`,
+  `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS customer_feedback_submitted_at TIMESTAMPTZ`,
 ];
 
 async function migrate() {

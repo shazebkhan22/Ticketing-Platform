@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { pool } from "../db/pool";
 import { REPAIR_LOCATIONS } from "../types/ticket";
+import { sendMail } from "../utils/mailer";
 
 // Quantity is derived from the ticket's comma-separated serial_number field
 // rather than stored on ticket_inventory — "xyz,abc" means 2 units came in
@@ -137,31 +138,56 @@ export async function upsertInventory(req: Request, res: Response) {
     return res.status(400).json({ error: "Expected return date cannot be after the outward date" });
   }
 
-  const ticketResult = await pool.query("SELECT sr_no FROM tickets WHERE sr_no = $1", [srNo]);
+  const ticketResult = await pool.query(
+    "SELECT sr_no, ticket_no, company_name, email_id FROM tickets WHERE sr_no = $1",
+    [srNo]
+  );
   if (ticketResult.rows.length === 0) {
     return res.status(404).json({ error: "Ticket not found" });
   }
+  const ticket = ticketResult.rows[0];
+
+  const existingResult = await pool.query(
+    "SELECT outward_date, outward_notified_at FROM ticket_inventory WHERE ticket_sr_no = $1",
+    [srNo]
+  );
+  const existing = existingResult.rows[0];
+  const newOutwardDate = d.outwardDate || null;
+  // Only notify the first time an outward date is actually set — re-saving
+  // the same (or a different) outward date on an already-notified ticket
+  // shouldn't send another "your product has shipped" email.
+  const shouldNotify = newOutwardDate && !existing?.outward_date && !existing?.outward_notified_at;
 
   const result = await pool.query(
     `INSERT INTO ticket_inventory (
-      ticket_sr_no, inward_date, outward_date, repair_location, outsource_vendor, expected_return_date
-    ) VALUES ($1, $2, $3, $4, $5, $6)
+      ticket_sr_no, inward_date, outward_date, repair_location, outsource_vendor, expected_return_date, outward_notified_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
     ON CONFLICT (ticket_sr_no) DO UPDATE SET
       inward_date = EXCLUDED.inward_date,
       outward_date = EXCLUDED.outward_date,
       repair_location = EXCLUDED.repair_location,
       outsource_vendor = EXCLUDED.outsource_vendor,
-      expected_return_date = EXCLUDED.expected_return_date
+      expected_return_date = EXCLUDED.expected_return_date,
+      outward_notified_at = COALESCE(ticket_inventory.outward_notified_at, EXCLUDED.outward_notified_at)
     RETURNING *`,
     [
       srNo,
       d.inwardDate || null,
-      d.outwardDate || null,
+      newOutwardDate,
       d.repairLocation ?? "In-House",
       d.outsourceVendor || null,
       d.expectedReturnDate || null,
+      shouldNotify ? new Date() : null,
     ]
   );
+
+  if (shouldNotify && ticket.email_id) {
+    await sendMail({
+      to: ticket.email_id,
+      subject: `Your product has been repaired and sent — ${ticket.ticket_no}`,
+      text: `Hi ${ticket.company_name},\n\nYour product for ticket ${ticket.ticket_no} has been repaired and dispatched back to you.\n\nThank you for your patience.`,
+    });
+  }
 
   const row = result.rows[0];
   res.json({

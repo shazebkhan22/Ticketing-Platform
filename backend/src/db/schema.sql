@@ -63,7 +63,15 @@ CREATE TABLE tickets (
   internal_tag internal_tag NOT NULL DEFAULT 'External',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  closed_at TIMESTAMPTZ
+  closed_at TIMESTAMPTZ,
+  -- Customer feedback form: a token is generated when the ticket closes,
+  -- emailed 24h later (see jobs/feedbackReminder.ts), and lets the customer
+  -- submit feedback on a public, unauthenticated page without a login.
+  feedback_token TEXT UNIQUE,
+  feedback_requested_at TIMESTAMPTZ,
+  customer_feedback_rating SMALLINT,
+  customer_feedback_comment TEXT,
+  customer_feedback_submitted_at TIMESTAMPTZ
 );
 
 CREATE INDEX idx_tickets_customer_id ON tickets(customer_id);
@@ -111,6 +119,10 @@ CREATE TABLE ticket_inventory (
   repair_location repair_location NOT NULL DEFAULT 'In-House',
   outsource_vendor TEXT,
   expected_return_date DATE,
+  -- Set the first time an outward date save triggers the "repaired and
+  -- sent" customer email, so re-saving the same outward date doesn't spam
+  -- another email.
+  outward_notified_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

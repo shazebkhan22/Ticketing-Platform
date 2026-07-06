@@ -53,3 +53,21 @@ export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 export const ticketFeedbackSchema = z.string().max(50, "Max 50 characters");
 
 export const ticketRemarkSchema = z.string().trim().min(1, "Remark cannot be empty");
+
+export const smtpSettingsSchema = z.object({
+  host: z.string().min(1, "Required"),
+  port: z.number().int().positive("Required"),
+  username: z.string().optional(),
+  // Blank means "keep the existing password" on update — see backend
+  // controllers/settings.ts, which never echoes the stored password back.
+  password: z.string().optional(),
+  fromAddress: z.string().min(1, "Required").email({ message: "Invalid email" }),
+  secure: z.boolean(),
+});
+export type SmtpSettingsValues = z.infer<typeof smtpSettingsSchema>;
+
+export const feedbackSubmissionSchema = z.object({
+  rating: z.number().int().min(1, "Please select a rating").max(5),
+  comment: z.string().max(1000, "Max 1000 characters").optional(),
+});
+export type FeedbackSubmissionValues = z.infer<typeof feedbackSubmissionSchema>;

@@ -10,6 +10,9 @@ import { metaRouter } from "./routes/meta";
 import { activityRouter } from "./routes/activity";
 import { customersRouter } from "./routes/customers";
 import { inventoryRouter } from "./routes/inventory";
+import { settingsRouter } from "./routes/settings";
+import { feedbackRouter } from "./routes/feedback";
+import { startFeedbackReminderJob } from "./jobs/feedbackReminder";
 
 const app = express();
 
@@ -55,6 +58,8 @@ app.use("/api/meta", metaRouter);
 app.use("/api/activity", activityRouter);
 app.use("/api/customers", customersRouter);
 app.use("/api/inventory", inventoryRouter);
+app.use("/api/settings", settingsRouter);
+app.use("/api/public/feedback", feedbackRouter);
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
@@ -64,3 +69,5 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 app.listen(env.port, () => {
   console.log(`Cygnus Ticketing backend listening on port ${env.port}`);
 });
+
+startFeedbackReminderJob();
