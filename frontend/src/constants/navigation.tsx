@@ -5,7 +5,7 @@ import {
   PlusCircleIcon,
   HistoryIcon,
   BuildingIcon,
-  // ChartNoAxesCombined
+  // Settings,
 } from "lucide-react";
 
 export const NAV_MAIN = [
@@ -24,5 +24,5 @@ export const NAV_ADMIN = [
 ];
 
 export const NAV_SECONDARY = [
-  
+  // {title : "Settings", url: "/settings", icon: <Settings />},
 ];

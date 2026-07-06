@@ -40,7 +40,7 @@ export function CustomersPage() {
       <div>
         <h2 className="text-lg font-semibold text-neutral-800">Customers</h2>
         <p className="text-sm text-neutral-500">
-          Every company tickets have been logged for, with their full service history.
+        Centralize customer information, contacts, and support activity in one dashboard.
         </p>
       </div>
 

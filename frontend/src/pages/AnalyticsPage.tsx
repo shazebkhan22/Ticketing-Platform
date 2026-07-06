@@ -55,11 +55,11 @@ export function AnalyticsPage() {
   const { data, isLoading } = useAnalytics();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-neutral-800">Analytics</h2>
         <p className="text-sm text-neutral-500">
-          View your ticketing system analytics and reports.
+        Track support performance across ticket lifecycles with insightful visual reports.
         </p>
       </div>
 
