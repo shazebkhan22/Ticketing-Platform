@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { pool } from "../db/pool";
+import { logger } from "./logger";
 
 interface MailInput {
   to: string;
@@ -17,7 +18,7 @@ export async function sendMail(input: MailInput): Promise<void> {
   );
   const config = result.rows[0];
   if (!config || !config.host || !config.from_address) {
-    console.warn(`Skipping email to ${input.to}: SMTP is not configured`);
+    logger.warn({ to: input.to }, "Skipping email: SMTP is not configured");
     return;
   }
 
@@ -36,6 +37,6 @@ export async function sendMail(input: MailInput): Promise<void> {
       text: input.text,
     });
   } catch (err) {
-    console.error(`Failed to send email to ${input.to}:`, err);
+    logger.error({ err, to: input.to }, "Failed to send email");
   }
 }

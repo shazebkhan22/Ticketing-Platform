@@ -1,4 +1,5 @@
 import { pool } from "../db/pool";
+import { logger } from "./logger";
 
 export interface LogActivityInput {
   actorUserId?: number | null;
@@ -26,6 +27,6 @@ export async function logActivity(input: LogActivityInput): Promise<void> {
       ]
     );
   } catch (err) {
-    console.error("Failed to write activity log:", err);
+    logger.error({ err }, "Failed to write activity log");
   }
 }

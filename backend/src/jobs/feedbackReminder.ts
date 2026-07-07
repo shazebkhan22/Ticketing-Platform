@@ -3,6 +3,7 @@ import { pool } from "../db/pool";
 import { sendMail } from "../utils/mailer";
 import { generateFeedbackToken } from "../utils/feedbackToken";
 import { env } from "../config/env";
+import { logger } from "../utils/logger";
 
 // Runs every 15 minutes, looking for tickets that closed at least 24h ago
 // and haven't had a feedback email sent yet. A token is generated lazily
@@ -40,7 +41,7 @@ async function runFeedbackReminderSweep() {
 export function startFeedbackReminderJob() {
   cron.schedule("*/15 * * * *", () => {
     runFeedbackReminderSweep().catch((err) => {
-      console.error("Feedback reminder sweep failed:", err);
+      logger.error({ err }, "Feedback reminder sweep failed");
     });
   });
 }
