@@ -22,6 +22,9 @@ const TicketFormPage = lazy(() =>
 const ProfilePage = lazy(() =>
   import("@/pages/ProfilePage").then((m) => ({ default: m.ProfilePage }))
 );
+const PasswordPage = lazy(() =>
+  import("@/pages/PasswordPage").then((m) => ({ default: m.PasswordPage }))
+);
 const ActivityLogPage = lazy(() =>
   import("@/pages/ActivityLogPage").then((m) => ({ default: m.ActivityLogPage }))
 );
@@ -78,6 +81,7 @@ function App() {
                   <Route path="/tickets/:srNo" element={<TicketDetailPage />} />
                   <Route path="/tickets/:srNo/edit" element={<TicketFormPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/password" element={<PasswordPage />} />
                   <Route element={<AdminRoute />}>
                     <Route path="/activity" element={<ActivityLogPage />} />
                     <Route path="/customers" element={<CustomersPage />} />

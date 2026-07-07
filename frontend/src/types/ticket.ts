@@ -103,6 +103,7 @@ export interface MetaOptions {
   priorities: TicketPriority[];
   accountManagers: string[];
   assignedBys: string[];
+  companyNames: string[];
   assignedToOptions: Employee[];
 }
 

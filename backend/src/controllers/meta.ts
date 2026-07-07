@@ -32,6 +32,13 @@ export async function getOptions(_req: Request, res: Response) {
     "SELECT DISTINCT assigned_by FROM tickets WHERE assigned_by IS NOT NULL ORDER BY assigned_by"
   );
 
+  // "Company Name" is free text and the same company can be typed slightly
+  // differently across tickets — surface previously-used values so users can
+  // pick an existing spelling instead of creating a near-duplicate.
+  const companyNamesResult = await pool.query(
+    "SELECT DISTINCT company_name FROM tickets ORDER BY company_name"
+  );
+
   res.json({
     modes: TICKET_MODES,
     callTypes: CALL_TYPES,
@@ -40,6 +47,7 @@ export async function getOptions(_req: Request, res: Response) {
     priorities: TICKET_PRIORITIES,
     accountManagers: accountManagersResult.rows.map((r) => r.account_manager),
     assignedBys: assignedByResult.rows.map((r) => r.assigned_by),
+    companyNames: companyNamesResult.rows.map((r) => r.company_name),
     assignedToOptions: employeesResult.rows.map((r) => ({
       id: r.id,
       displayName: r.display_name,

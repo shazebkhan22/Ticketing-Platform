@@ -204,7 +204,14 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Company Name *</FormLabel>
                   <FormControl>
-                    <Input capitalize {...field} />
+                    <Combobox
+                      value={field.value}
+                      onChange={field.onChange}
+                      options={options.companyNames.map((c) => ({ value: c, label: c }))}
+                      placeholder="Select or type a company name"
+                      searchPlaceholder="Search or type a name..."
+                      allowCustomValue
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

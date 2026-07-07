@@ -19,7 +19,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, LogOutIcon, UserIcon } from "lucide-react"
+import { ChevronsUpDownIcon, KeyRoundIcon, LogOutIcon, UserIcon } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 
 export function NavUser() {
@@ -78,6 +78,11 @@ export function NavUser() {
             <DropdownMenuItem onClick={() => navigate("/profile")}>
               <UserIcon />
               Profile
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate("/password")}>
+              <KeyRoundIcon />
+              Change Password
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} variant="destructive">
