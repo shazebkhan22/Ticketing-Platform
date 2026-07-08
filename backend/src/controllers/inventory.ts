@@ -139,7 +139,7 @@ export async function upsertInventory(req: Request, res: Response) {
   }
 
   const ticketResult = await pool.query(
-    "SELECT sr_no, ticket_no, company_name, email_id FROM tickets WHERE sr_no = $1",
+    "SELECT sr_no, ticket_no, company_name, contact_name, email_id FROM tickets WHERE sr_no = $1",
     [srNo]
   );
   if (ticketResult.rows.length === 0) {
@@ -160,15 +160,14 @@ export async function upsertInventory(req: Request, res: Response) {
 
   const result = await pool.query(
     `INSERT INTO ticket_inventory (
-      ticket_sr_no, inward_date, outward_date, repair_location, outsource_vendor, expected_return_date, outward_notified_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ticket_sr_no, inward_date, outward_date, repair_location, outsource_vendor, expected_return_date
+    ) VALUES ($1, $2, $3, $4, $5, $6)
     ON CONFLICT (ticket_sr_no) DO UPDATE SET
       inward_date = EXCLUDED.inward_date,
       outward_date = EXCLUDED.outward_date,
       repair_location = EXCLUDED.repair_location,
       outsource_vendor = EXCLUDED.outsource_vendor,
-      expected_return_date = EXCLUDED.expected_return_date,
-      outward_notified_at = COALESCE(ticket_inventory.outward_notified_at, EXCLUDED.outward_notified_at)
+      expected_return_date = EXCLUDED.expected_return_date
     RETURNING *`,
     [
       srNo,
@@ -177,19 +176,25 @@ export async function upsertInventory(req: Request, res: Response) {
       d.repairLocation ?? "In-House",
       d.outsourceVendor || null,
       d.expectedReturnDate || null,
-      shouldNotify ? new Date() : null,
     ]
   );
 
+  let row = result.rows[0];
   if (shouldNotify && ticket.email_id) {
-    await sendMail({
+    const sent = await sendMail({
       to: ticket.email_id,
       subject: `Your product has been repaired and sent — ${ticket.ticket_no}`,
-      text: `Hi ${ticket.company_name},\n\nYour product for ticket ${ticket.ticket_no} has been repaired and dispatched back to you.\n\nThank you for your patience.`,
+      text: `Hi ${ticket.contact_name},\n\nYour product for ticket ${ticket.ticket_no} has been repaired and dispatched back to you.\n\nThank you for your patience.`,
     });
+    if (sent) {
+      const notifiedResult = await pool.query(
+        `UPDATE ticket_inventory SET outward_notified_at = now() WHERE ticket_sr_no = $1 RETURNING *`,
+        [srNo]
+      );
+      row = notifiedResult.rows[0];
+    }
   }
 
-  const row = result.rows[0];
   res.json({
     srNo: row.ticket_sr_no,
     inwardDate: row.inward_date,
