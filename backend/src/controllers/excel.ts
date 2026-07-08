@@ -19,22 +19,22 @@ const COLUMNS = [
   { header: "Ticket No", key: "ticketNo", width: 14 },
   { header: "Date Received", key: "ticketDate", width: 14 },
   { header: "Mode", key: "mode", width: 10 },
-  { header: "Company Name", key: "companyName", width: 24 },
+  { header: "Company Name", key: "companyName", width: 28 },
   { header: "Contact Name", key: "contactName", width: 18 },
   { header: "Contact No", key: "contactNo", width: 14 },
-  { header: "Email ID", key: "emailId", width: 22 },
+  { header: "Email ID", key: "emailId", width: 26 },
   { header: "Address", key: "address", width: 28 },
-  { header: "Model", key: "model", width: 16 },
+  { header: "Model", key: "model", width: 20 },
   { header: "Serial Number", key: "serialNumber", width: 18 },
-  { header: "Problem", key: "problem", width: 36 },
+  { header: "Problem", key: "problem", width: 40 },
   { header: "Account Manager", key: "accountManager", width: 20 },
-  { header: "Assigned By", key: "assignedBy", width: 20 },
-  { header: "Call Type", key: "callType", width: 14 },
-  { header: "Assigned To", key: "assignedTo", width: 20 },
+  { header: "Assigned By", key: "assignedBy", width: 16 },
+  { header: "Call Type", key: "callType", width: 12 },
+  { header: "Assigned To", key: "assignedTo", width: 30 },
   { header: "Priority", key: "priority", width: 10 },
   { header: "Deadline Date", key: "deadlineDate", width: 14 },
   { header: "Status", key: "status", width: 12 },
-  { header: "Feedback From User", key: "feedback", width: 16 },
+  { header: "Feedback From User", key: "feedback", width: 24 },
   { header: "Internal Tag", key: "internalTag", width: 12 },
 ] as const;
 
@@ -127,8 +127,8 @@ export async function exportTickets(req: Request, res: Response) {
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const result = await pool.query(
     `SELECT t.*,
-      (SELECT string_agg(r.remark_date || ': ' || r.body, E'\\n' ORDER BY r.created_at)
-       FROM remarks r WHERE r.ticket_sr_no = t.sr_no) AS remarks,
+      (SELECT array_agg(r.remark_date || ': ' || r.body ORDER BY r.created_at)
+       FROM remarks r WHERE r.ticket_sr_no = t.sr_no) AS remarks_list,
       (SELECT string_agg(u.display_name, ', ' ORDER BY u.display_name)
        FROM ticket_assignees ta JOIN users u ON u.id = ta.user_id
        WHERE ta.ticket_sr_no = t.sr_no) AS assigned_to_names
@@ -141,7 +141,17 @@ export async function exportTickets(req: Request, res: Response) {
   sheet.columns = [...COLUMNS, ...UPDATE_COLUMNS] as unknown as ExcelJS.Column[];
   sheet.getRow(1).font = { bold: true };
 
-  for (const row of result.rows) {
+  // Individual remarks live on a hidden sheet, one ticket per row, so the
+  // visible Remarks cell can show a dropdown instead of one long wrapped
+  // block of text (Excel data validation lists need a cell range to source
+  // their options from).
+  const lookupSheet = workbook.addWorksheet("RemarksLookup");
+  lookupSheet.state = "veryHidden";
+  const remarksColLetter = sheet.getColumn("remarks").letter;
+
+  result.rows.forEach((row, i) => {
+    const remarksList: string[] = row.remarks_list ?? [];
+
     sheet.addRow({
       ticketNo: row.ticket_no,
       ticketDate: row.ticket_date,
@@ -163,9 +173,26 @@ export async function exportTickets(req: Request, res: Response) {
       status: row.status,
       feedback: row.feedback,
       internalTag: row.internal_tag,
-      remarks: row.remarks ?? "",
+      remarks: remarksList.length > 0 ? remarksList[remarksList.length - 1] : "",
     });
-  }
+
+    if (remarksList.length > 0) {
+      const lookupRowNum = i + 1;
+      const lookupRow = lookupSheet.getRow(lookupRowNum);
+      remarksList.forEach((remark, col) => {
+        lookupRow.getCell(col + 1).value = remark;
+      });
+      lookupRow.commit();
+
+      const dataRowNum = i + 2; // header row offset
+      const lastCol = String.fromCharCode("A".charCodeAt(0) + remarksList.length - 1);
+      sheet.getCell(`${remarksColLetter}${dataRowNum}`).dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: [`RemarksLookup!$A$${lookupRowNum}:$${lastCol}$${lookupRowNum}`],
+      };
+    }
+  });
   sheet.getColumn("ticketDate").numFmt = "yyyy-mm-dd";
   sheet.getColumn("deadlineDate").numFmt = "yyyy-mm-dd";
   sheet.getColumn("remarks").alignment = { wrapText: true };
