@@ -3,6 +3,7 @@ import { z } from "zod";
 import { pool } from "../db/pool";
 import { REPAIR_LOCATIONS } from "../types/ticket";
 import { sendMail } from "../utils/mailer";
+import { renderEmailHtml } from "../utils/emailTemplate";
 
 // Quantity is derived from the ticket's comma-separated serial_number field
 // rather than stored on ticket_inventory — "xyz,abc" means 2 units came in
@@ -181,10 +182,13 @@ export async function upsertInventory(req: Request, res: Response) {
 
   let row = result.rows[0];
   if (shouldNotify && ticket.email_id) {
+    const text = `Dear ${ticket.contact_name},\n\nWe are pleased to inform you that the repair for your product under ticket ${ticket.ticket_no} has been completed and dispatched back to you.\n\nThank you for your patience throughout this process. Please do not hesitate to reach out if you have any questions.\n\nBest regards,\nSupport Team`;
+
     const sent = await sendMail({
       to: ticket.email_id,
-      subject: `Your product has been repaired and sent — ${ticket.ticket_no}`,
-      text: `Hi ${ticket.contact_name},\n\nYour product for ticket ${ticket.ticket_no} has been repaired and dispatched back to you.\n\nThank you for your patience.`,
+      subject: `Repair Completed and Dispatched — Ticket ${ticket.ticket_no}`,
+      text,
+      html: renderEmailHtml(text),
     });
     if (sent) {
       const notifiedResult = await pool.query(

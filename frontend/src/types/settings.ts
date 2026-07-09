@@ -3,6 +3,7 @@ export interface SmtpSettings {
   port: number;
   username: string;
   fromAddress: string;
+  fromName: string;
   secure: boolean;
   hasPassword: boolean;
 }
@@ -13,5 +14,6 @@ export interface SmtpSettingsInput {
   username?: string;
   password?: string;
   fromAddress: string;
+  fromName?: string;
   secure: boolean;
 }

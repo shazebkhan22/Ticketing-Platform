@@ -118,6 +118,7 @@ const ADDITIVE_MIGRATIONS = [
   `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS customer_feedback_rating SMALLINT`,
   `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS customer_feedback_comment TEXT`,
   `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS customer_feedback_submitted_at TIMESTAMPTZ`,
+  `ALTER TABLE smtp_config ADD COLUMN IF NOT EXISTS from_name TEXT`,
 ];
 
 async function migrate() {

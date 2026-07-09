@@ -148,6 +148,7 @@ CREATE TABLE smtp_config (
   username TEXT,
   password TEXT,
   from_address TEXT,
+  from_name TEXT,
   secure BOOLEAN NOT NULL DEFAULT false,
   CONSTRAINT smtp_config_singleton CHECK (id = 1)
 );

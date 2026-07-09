@@ -62,6 +62,7 @@ export const smtpSettingsSchema = z.object({
   // controllers/settings.ts, which never echoes the stored password back.
   password: z.string().optional(),
   fromAddress: z.string().min(1, "Required").email({ message: "Invalid email" }),
+  fromName: z.string().optional(),
   secure: z.boolean(),
 });
 export type SmtpSettingsValues = z.infer<typeof smtpSettingsSchema>;

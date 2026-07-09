@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { pool } from "../db/pool";
 import { sendMail } from "../utils/mailer";
+import { renderEmailHtml } from "../utils/emailTemplate";
 import { generateFeedbackToken } from "../utils/feedbackToken";
 import { env } from "../config/env";
 import { logger } from "../utils/logger";
@@ -11,7 +12,7 @@ import { logger } from "../utils/logger";
 // it's actually needed.
 async function runFeedbackReminderSweep() {
   const result = await pool.query(
-    `SELECT sr_no, ticket_no, company_name, email_id
+    `SELECT sr_no, ticket_no, company_name,contact_name, email_id
      FROM tickets
      WHERE status = 'Closed'
        AND closed_at IS NOT NULL
@@ -25,10 +26,13 @@ async function runFeedbackReminderSweep() {
     const token = generateFeedbackToken();
     const link = `${env.frontendOrigin}/feedback/${token}`;
 
+    const text = `Dear ${ticket.contact_name},\n\nYour ticket ${ticket.ticket_no} has recently been closed. We would greatly appreciate a moment of your time to share your feedback:\n${link}\n\nThank you for your continued trust in our services.\n\nBest regards,\nSupport Team`;
+
     await sendMail({
       to: ticket.email_id,
-      subject: `How did we do? Feedback for ticket ${ticket.ticket_no}`,
-      text: `Hi ${ticket.company_name},\n\nYour ticket ${ticket.ticket_no} was recently closed. We'd appreciate your feedback:\n${link}\n\nThanks!`,
+      subject: `We'd Value Your Feedback — Ticket ${ticket.ticket_no}`,
+      text,
+      html: renderEmailHtml(text),
     });
 
     await pool.query(

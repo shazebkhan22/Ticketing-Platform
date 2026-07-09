@@ -6,6 +6,7 @@ interface MailInput {
   to: string;
   subject: string;
   text: string;
+  html?: string;
 }
 
 // SMTP credentials live in the smtp_config singleton row (see Settings page)
@@ -18,7 +19,7 @@ interface MailInput {
 // and never retried.
 export async function sendMail(input: MailInput): Promise<boolean> {
   const result = await pool.query(
-    "SELECT host, port, username, password, from_address, secure FROM smtp_config WHERE id = 1"
+    "SELECT host, port, username, password, from_address, from_name, secure FROM smtp_config WHERE id = 1"
   );
   const config = result.rows[0];
   if (!config || !config.host || !config.from_address) {
@@ -35,10 +36,11 @@ export async function sendMail(input: MailInput): Promise<boolean> {
 
   try {
     await transporter.sendMail({
-      from: config.from_address,
+      from: config.from_name ? { name: config.from_name, address: config.from_address } : config.from_address,
       to: input.to,
       subject: input.subject,
       text: input.text,
+      html: input.html,
     });
     return true;
   } catch (err) {

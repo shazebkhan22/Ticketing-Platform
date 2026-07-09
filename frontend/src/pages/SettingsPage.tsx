@@ -28,6 +28,7 @@ export function SettingsPage() {
       username: "",
       password: "",
       fromAddress: "",
+      fromName: "",
       secure: false,
     },
   });
@@ -40,6 +41,7 @@ export function SettingsPage() {
       username: settings.username,
       password: "",
       fromAddress: settings.fromAddress,
+      fromName: settings.fromName,
       secure: settings.secure,
     });
   }, [settings, form]);
@@ -146,6 +148,20 @@ export function SettingsPage() {
                     <FormLabel>From Address</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="noreply@company.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="fromName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>From Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Cygnus Support" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
