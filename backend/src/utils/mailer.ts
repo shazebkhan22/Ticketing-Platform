@@ -1,6 +1,19 @@
 import nodemailer from "nodemailer";
 import { pool } from "../db/pool";
 import { logger } from "./logger";
+import { decryptSecret } from "./secretCrypto";
+
+// Passwords saved before encryption support was added are still plaintext in
+// the DB; decryptSecret's "v1:..." format check lets us tell those apart and
+// use them as-is instead of erroring, until the admin re-saves SMTP settings.
+function decryptStoredPassword(stored: string | null): string | undefined {
+  if (!stored) return undefined;
+  try {
+    return decryptSecret(stored);
+  } catch {
+    return stored;
+  }
+}
 
 interface MailInput {
   to: string;
@@ -31,7 +44,7 @@ export async function sendMail(input: MailInput): Promise<boolean> {
     host: config.host,
     port: config.port ?? 587,
     secure: config.secure,
-    auth: config.username ? { user: config.username, pass: config.password } : undefined,
+    auth: config.username ? { user: config.username, pass: decryptStoredPassword(config.password) } : undefined,
   });
 
   try {

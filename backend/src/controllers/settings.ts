@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { pool } from "../db/pool";
+import { encryptSecret } from "../utils/secretCrypto";
 
 const smtpSettingsSchema = z.object({
   host: z.string().min(1),
@@ -38,7 +39,7 @@ export async function updateSmtpSettings(req: Request, res: Response) {
   const d = parsed.data;
 
   const existing = await pool.query("SELECT password FROM smtp_config WHERE id = 1");
-  const password = d.password || existing.rows[0]?.password || null;
+  const password = d.password ? encryptSecret(d.password) : existing.rows[0]?.password || null;
 
   await pool.query(
     `INSERT INTO smtp_config (id, host, port, username, password, from_address, from_name, secure)

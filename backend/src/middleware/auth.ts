@@ -3,11 +3,20 @@ import { z } from "zod";
 import { pool } from "../db/pool";
 
 const srNoParamSchema = z.coerce.number().int().positive();
+const idParamSchema = z.coerce.number().int().positive();
 
 export function validateSrNoParam(req: Request, res: Response, next: NextFunction) {
   const parsed = srNoParamSchema.safeParse(req.params.srNo);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid ticket reference" });
+  }
+  next();
+}
+
+export function validateIdParam(req: Request, res: Response, next: NextFunction) {
+  const parsed = idParamSchema.safeParse(req.params.id);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid id" });
   }
   next();
 }

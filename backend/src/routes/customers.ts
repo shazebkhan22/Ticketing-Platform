@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAdmin } from "../middleware/auth";
+import { requireAdmin, validateIdParam } from "../middleware/auth";
 import { listCustomers, getCustomer } from "../controllers/customers";
 
 export const customersRouter = Router();
@@ -8,4 +8,4 @@ export const customersRouter = Router();
 // App.tsx / constants/navigation.tsx).
 customersRouter.use(requireAdmin);
 customersRouter.get("/", listCustomers);
-customersRouter.get("/:id", getCustomer);
+customersRouter.get("/:id", validateIdParam, getCustomer);

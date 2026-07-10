@@ -1,6 +1,7 @@
 import "express-async-errors";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import pinoHttp from "pino-http";
@@ -18,6 +19,11 @@ import { settingsRouter } from "./routes/settings";
 import { feedbackRouter } from "./routes/feedback";
 
 export const app = express();
+
+// Baseline security headers (X-Content-Type-Options, HSTS, etc.). CSP is
+// disabled here because this is a pure JSON API with no served frontend —
+// the React app runs on a separate origin and sets its own CSP.
+app.use(helmet({ contentSecurityPolicy: false }));
 
 // Structured request logs (method, path, status, duration, request id) —
 // the request id is echoed in error responses below so a user-reported

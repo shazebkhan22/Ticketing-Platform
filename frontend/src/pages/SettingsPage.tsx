@@ -115,7 +115,7 @@ export function SettingsPage() {
                   <FormItem>
                     <FormLabel>Username</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input autoComplete="off" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -131,6 +131,7 @@ export function SettingsPage() {
                     <FormControl>
                       <Input
                         type="password"
+                        autoComplete="new-password"
                         placeholder={settings?.hasPassword ? "Leave blank to keep current password" : ""}
                         {...field}
                       />

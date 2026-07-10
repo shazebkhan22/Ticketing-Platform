@@ -39,6 +39,13 @@ export async function login(req: Request, res: Response) {
     return res.status(401).json({ error: "Invalid username or password" });
   }
 
+  // Rotate the session ID on login so a session ID an attacker may have
+  // fixed/known before authentication can't become an authenticated one
+  // (session fixation).
+  await new Promise<void>((resolve, reject) => {
+    req.session.regenerate((err) => (err ? reject(err) : resolve()));
+  });
+
   req.session.userId = user.id;
   req.session.username = user.username;
   req.session.role = user.role;

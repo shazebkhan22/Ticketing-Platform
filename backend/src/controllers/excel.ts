@@ -63,6 +63,25 @@ function cellToString(value: unknown): string | undefined {
   return str || undefined;
 }
 
+// Excel/CSV formula injection guard: a cell value starting with =, +, - or @
+// is interpreted by Excel as a formula when the file is opened, which lets
+// attacker-influenced ticket data (company name, problem, remarks, etc.)
+// execute HYPERLINK/webservice formulas or worse against whoever opens an
+// export. Prefixing with a single quote forces Excel to treat it as literal
+// text instead of a formula, without changing what's displayed.
+function sanitizeForExcel(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
+function sanitizeRowValues<T extends Record<string, unknown>>(row: T): T {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    sanitized[key] = sanitizeForExcel(value);
+  }
+  return sanitized as T;
+}
+
 export async function exportTickets(req: Request, res: Response) {
   const {
     status,
@@ -152,35 +171,37 @@ export async function exportTickets(req: Request, res: Response) {
   result.rows.forEach((row, i) => {
     const remarksList: string[] = row.remarks_list ?? [];
 
-    sheet.addRow({
-      ticketNo: row.ticket_no,
-      ticketDate: row.ticket_date,
-      mode: row.mode,
-      companyName: row.company_name,
-      contactName: row.contact_name,
-      contactNo: row.contact_no,
-      emailId: row.email_id,
-      address: row.address,
-      model: row.model,
-      serialNumber: row.serial_number,
-      problem: row.problem,
-      accountManager: row.account_manager,
-      assignedBy: row.assigned_by,
-      callType: row.call_type,
-      assignedTo: row.assigned_to_names ?? "",
-      priority: row.priority,
-      deadlineDate: row.deadline_date,
-      status: row.status,
-      feedback: row.feedback,
-      internalTag: row.internal_tag,
-      remarks: remarksList.length > 0 ? remarksList[remarksList.length - 1] : "",
-    });
+    sheet.addRow(
+      sanitizeRowValues({
+        ticketNo: row.ticket_no,
+        ticketDate: row.ticket_date,
+        mode: row.mode,
+        companyName: row.company_name,
+        contactName: row.contact_name,
+        contactNo: row.contact_no,
+        emailId: row.email_id,
+        address: row.address,
+        model: row.model,
+        serialNumber: row.serial_number,
+        problem: row.problem,
+        accountManager: row.account_manager,
+        assignedBy: row.assigned_by,
+        callType: row.call_type,
+        assignedTo: row.assigned_to_names ?? "",
+        priority: row.priority,
+        deadlineDate: row.deadline_date,
+        status: row.status,
+        feedback: row.feedback,
+        internalTag: row.internal_tag,
+        remarks: remarksList.length > 0 ? remarksList[remarksList.length - 1] : "",
+      })
+    );
 
     if (remarksList.length > 0) {
       const lookupRowNum = i + 1;
       const lookupRow = lookupSheet.getRow(lookupRowNum);
       remarksList.forEach((remark, col) => {
-        lookupRow.getCell(col + 1).value = remark;
+        lookupRow.getCell(col + 1).value = sanitizeForExcel(remark) as string;
       });
       lookupRow.commit();
 
@@ -329,6 +350,16 @@ export async function importTickets(req: Request, res: Response) {
   const sheet = workbook.worksheets[0];
   if (!sheet) {
     return res.status(400).json({ error: "Workbook has no sheets" });
+  }
+
+  // Each row runs several sequential DB round trips; an unbounded row count
+  // (limited only by the 10MB file-size cap) can tie up a pool connection
+  // and the event loop for a very long time on one request.
+  const MAX_IMPORT_ROWS = 2000;
+  if (sheet.rowCount - 1 > MAX_IMPORT_ROWS) {
+    return res.status(400).json({
+      error: `Workbook has too many rows (max ${MAX_IMPORT_ROWS} tickets per import)`,
+    });
   }
 
   const headerRow = sheet.getRow(1);

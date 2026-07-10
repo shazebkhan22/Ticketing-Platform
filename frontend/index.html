@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/Cygnus_C.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Defense-in-depth against XSS: no inline/external script is allowed to
+      execute even if one were ever injected. connect-src covers same-origin
+      (the production API is expected behind the same reverse proxy per
+      backend/src/app.ts's trust-proxy comment) plus the local dev API port —
+      adjust connect-src if the API is ever served from a different origin
+      in production. style-src allows 'unsafe-inline' because Tailwind and
+      components/ui/chart.tsx inject <style> tags at runtime.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://res.cloudinary.com; font-src 'self' data:; connect-src 'self' http://localhost:4000; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    />
     <title>Cygnus Ticketing System</title>
   </head>
   <body>

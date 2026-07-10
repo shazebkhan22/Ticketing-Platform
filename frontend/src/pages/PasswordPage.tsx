@@ -52,7 +52,7 @@ export function PasswordPage() {
                 <FormItem>
                   <FormLabel>Current Password</FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} />
+                    <Input type="password" autoComplete="current-password" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -66,7 +66,7 @@ export function PasswordPage() {
                 <FormItem>
                   <FormLabel>New Password</FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} />
+                    <Input type="password" autoComplete="new-password" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -80,7 +80,7 @@ export function PasswordPage() {
                 <FormItem>
                   <FormLabel>Confirm New Password</FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} />
+                    <Input type="password" autoComplete="new-password" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

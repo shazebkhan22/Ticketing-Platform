@@ -19,7 +19,9 @@ function mockRes() {
 function mockReq(body: unknown): Request {
   return {
     body,
-    session: {},
+    session: {
+      regenerate: (cb: (err?: unknown) => void) => cb(),
+    },
   } as unknown as Request;
 }
 
