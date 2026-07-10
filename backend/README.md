@@ -27,6 +27,7 @@ This document is the single source of truth for the backend. Read it top to bott
 12. [How to Inspect the Database](#12-how-to-inspect-the-database)
 13. [Adding New Features (Patterns to Follow)](#13-adding-new-features-patterns-to-follow)
 14. [Known Gaps / Not Yet Built](#14-known-gaps--not-yet-built)
+15. [Security Hardening (2026-07-10 audit)](#15-security-hardening-2026-07-10-audit)
 
 ---
 
@@ -569,3 +570,20 @@ These exist in the original spec but have no implementation yet — don't assume
 - **SMTP admin settings UI/API** — table exists, no endpoint.
 - **Per-call-type target resolution day editing** — `call_type_targets` table is seeded with defaults (Warranty=7, AMC=3) but there's no API to view/edit these from an admin panel yet.
 - **Frontend** — a full React SPA now exists (see `frontend/README.md`), including pages this document doesn't cover yet: Customers, Inventory, Activity Log, Profile. Their routes/controllers (`routes/customers.ts`, `controllers/customers.ts`, `routes/inventory.ts`, `controllers/inventory.ts`, `routes/activity.ts`) exist and work but aren't documented in [§8](#8-api-reference) yet — read those files directly, or the frontend's `src/api/*.ts` wrappers, until this section is updated.
+
+---
+
+## 15. Security Hardening (2026-07-10 audit)
+
+A full security audit (SQL injection, auth/authz, XSS, CSRF, secrets handling, infra) was run against the backend and frontend; the fixes below landed together. If you're extending any of the affected files, keep these invariants intact rather than reverting them for convenience.
+
+- **`helmet` middleware** (`src/app.ts`) — added ahead of every other middleware, with `contentSecurityPolicy: false` (the API returns JSON only; CSP is enforced by the frontend instead — see `frontend/README.md`). Sets baseline response headers (`X-Content-Type-Options`, etc.) on every `/api/*` response.
+- **Session fixation fix** (`src/controllers/auth.ts`, `login`) — `req.session.regenerate()` is now called before assigning `userId`/`role`/etc. on successful login, so a session ID that existed pre-authentication is never reused post-authentication. If you write a test against `login`, the mocked `req.session` object needs a `regenerate(cb)` stub (see `src/controllers/auth.test.ts`).
+- **SMTP password encryption at rest** (`src/utils/secretCrypto.ts`, new file) — `smtp_config.password` is now encrypted with AES-256-GCM before being written by `updateSmtpSettings` (`src/controllers/settings.ts`), and decrypted by `sendMail` (`src/utils/mailer.ts`) before use. The encryption key is derived from `SESSION_SECRET` via `scrypt` — no new required env var. `decryptSecret` falls back to returning the raw stored value if it isn't in the `v1:...` envelope format, so any password saved *before* this change keeps working until an admin re-saves it on the Settings page (which encrypts it going forward).
+- **Excel export formula-injection guard** (`src/controllers/excel.ts`) — `sanitizeForExcel`/`sanitizeRowValues` prefix any cell value starting with `=`, `+`, `-`, `@`, tab, or CR with a `'` before it's written into the exported `.xlsx`, so a company name / problem / remark like `=HYPERLINK(...)` can't execute as a formula when a staff member opens the export. Applied to both the main sheet and the hidden `RemarksLookup` sheet.
+- **Excel import row cap** (`src/controllers/excel.ts`, `importTickets`) — rejects workbooks with more than 2000 data rows before processing, since each row does several sequential DB round trips and an unbounded count could tie up a connection/the event loop for a long time (the 10MB `multer` file-size limit alone didn't bound this).
+- **`validateIdParam` middleware** (`src/middleware/auth.ts`) — mirrors the existing `validateSrNoParam` pattern; applied to `GET /api/customers/:id` (`src/routes/customers.ts`) so a non-numeric id gets a clean `400` instead of a raw `NaN`-parameter query error.
+- **Rate limiting on the public feedback endpoints** (`src/routes/feedback.ts`) — `GET/POST /api/public/feedback/:token` now sit behind the same `express-rate-limit` pattern as login (30 requests / 10 minutes per IP), as defense in depth even though the token itself has 192 bits of entropy.
+- **`autoComplete` attributes on every credential field** — login, change-password (`frontend/src/pages/PasswordPage.tsx`), and SMTP settings (`frontend/src/pages/SettingsPage.tsx`) inputs now declare the correct `autoComplete` value (`username`/`current-password`/`new-password`, or `off` for the SMTP username so it isn't conflated with the user's own login).
+
+**Not yet fixed** (flagged by the same audit, still open — see the audit conversation or re-run `/security-review` for the full list): no TLS termination in the shipped `nginx.conf`/Docker Compose files, containers run as root (no `USER` in either Dockerfile), the dev `docker-compose.yml` publishes Postgres/pgAdmin on all interfaces, the Postgres app role has superuser privileges instead of a least-privilege runtime role, no `statement_timeout` on the `pg.Pool`, `migrate.ts` runs its additive migrations outside a transaction, and there's no server-side validation of ticket status transitions (`Closed → Pending → Closed` churn is currently allowed).

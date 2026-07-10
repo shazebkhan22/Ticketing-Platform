@@ -116,3 +116,30 @@ calling `axios` directly from a page component.
   `App.tsx` — not wired up yet.
 - No automated frontend test suite yet; changes are verified manually
   against the running dev server.
+
+## Security Hardening (2026-07-10 audit)
+
+A full security audit was run against the app (see `backend/README.md` §15
+for the backend-side fixes from the same pass). Frontend-side changes:
+
+- **Content-Security-Policy meta tag** (`index.html`) — restricts
+  `script-src`/`default-src` to `'self'`, disallows framing
+  (`frame-ancestors 'none'`), and disallows plugins (`object-src 'none'`).
+  `style-src` allows `'unsafe-inline'` because Tailwind and
+  `components/ui/chart.tsx` inject `<style>` tags at runtime. `connect-src`
+  covers same-origin plus the local dev API port — **if the API is ever
+  served from a different origin than the frontend in production, update
+  `connect-src` accordingly or requests will be blocked.** This is on top of,
+  not instead of, the backend's `helmet` headers — `helmet`'s CSP is
+  disabled server-side specifically because this meta tag is the one that
+  actually applies to the page the browser renders.
+- **`autoComplete` attributes on every credential field** — the login form
+  (`components/login-form.tsx`) and the change-password/SMTP-settings pages
+  now set the correct `autoComplete` value so password managers don't
+  mis-fill or conflate unrelated credential fields.
+
+**Not yet fixed** (flagged by the same audit, still open): no
+`X-Frame-Options`/HSTS/`X-Content-Type-Options` response headers at the
+nginx layer that serves this app's build output in production (the CSP meta
+tag above only covers what a `<meta>` tag *can* express) — see
+`backend/README.md` §15 for the full list of open infra items.
