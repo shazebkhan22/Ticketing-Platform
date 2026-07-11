@@ -11,7 +11,7 @@ import {
   useTicketDetail,
   useUpdateTicket,
 } from "@/hooks/useTickets";
-import type { TicketDetail, TicketFormInput } from "@/types/ticket";
+import type { CustomerDirectoryEntry, TicketDetail, TicketFormInput } from "@/types/ticket";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -87,15 +87,28 @@ export function TicketFormPage() {
   const isAdmin = user?.role === "admin";
 
   const { data: options, isLoading: optionsLoading } = useMetaOptions();
-  const { data: ticketDetail, isLoading: ticketLoading } = useTicketDetail(ticketSrNo);
+  const { data: ticketDetail, isLoading: ticketLoading } =
+    useTicketDetail(ticketSrNo);
   const createTicketMutation = useCreateTicket();
   const updateTicketMutation = useUpdateTicket(ticketSrNo);
+
+  // Keyed by company name so selecting an existing company in the Combobox
+  // below can auto-fill its last-known contact details instead of the user
+  // re-typing them on every repeat ticket for the same company.
+  const customerByName = useMemo(() => {
+    const map = new Map<string, CustomerDirectoryEntry>();
+    (options?.customers ?? []).forEach((c) => map.set(c.name, c));
+    return map;
+  }, [options?.customers]);
 
   // Employees must always include themselves as an assignee (enforced again
   // on the backend) — a new ticket should default to that instead of an
   // empty picker, since it's always part of the final set either way.
   const emptyFormForUser = useMemo(
-    () => (!isAdmin && user ? { ...EMPTY_FORM, assigneeUserIds: [user.id] } : EMPTY_FORM),
+    () =>
+      !isAdmin && user
+        ? { ...EMPTY_FORM, assigneeUserIds: [user.id] }
+        : EMPTY_FORM,
     [isAdmin, user]
   );
 
@@ -105,7 +118,8 @@ export function TicketFormPage() {
   // being updated afterwards — Radix's Select trigger does not reliably
   // reflect a controlled `value` change that happens after initial mount.
   const defaultValues = useMemo(
-    () => (ticketDetail ? ticketToFormValues(ticketDetail.ticket) : emptyFormForUser),
+    () =>
+      ticketDetail ? ticketToFormValues(ticketDetail.ticket) : emptyFormForUser,
     [ticketDetail, emptyFormForUser]
   );
 
@@ -123,11 +137,15 @@ export function TicketFormPage() {
   async function onSubmit(values: TicketFormValues) {
     try {
       if (isEdit) {
-        await updateTicketMutation.mutateAsync(values as Partial<TicketFormInput>);
+        await updateTicketMutation.mutateAsync(
+          values as Partial<TicketFormInput>
+        );
         toast.success("Ticket updated");
         navigate(`/tickets/${ticketSrNo}`);
       } else {
-        const created = await createTicketMutation.mutateAsync(values as TicketFormInput);
+        const created = await createTicketMutation.mutateAsync(
+          values as TicketFormInput
+        );
         toast.success(`Ticket ${created.ticketNo} created`);
         navigate(`/tickets/${created.srNo}`);
       }
@@ -145,7 +163,8 @@ export function TicketFormPage() {
     );
   }
 
-  const submitting = createTicketMutation.isPending || updateTicketMutation.isPending;
+  const submitting =
+    createTicketMutation.isPending || updateTicketMutation.isPending;
 
   return (
     <div className="">
@@ -165,7 +184,11 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Date Received *</FormLabel>
                   <FormControl>
-                    <DatePicker disabled value={field.value} onChange={field.onChange} />
+                    <DatePicker
+                      disabled
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -206,8 +229,32 @@ export function TicketFormPage() {
                   <FormControl>
                     <Combobox
                       value={field.value}
-                      onChange={field.onChange}
-                      options={options.companyNames.map((c) => ({ value: c, label: c }))}
+                      onChange={(name) => {
+                        field.onChange(name);
+                        const customer = customerByName.get(name);
+                        if (customer) {
+                          form.setValue("contactName", customer.contactName ?? "", {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                          form.setValue("contactNo", customer.contactNo ?? "", {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                          form.setValue("emailId", customer.emailId ?? "", {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                          form.setValue("address", customer.address ?? "", {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                        }
+                      }}
+                      options={options.companyNames.map((c) => ({
+                        value: c,
+                        label: c,
+                      }))}
                       placeholder="Select or type a company name"
                       searchPlaceholder="Search or type a name..."
                       allowCustomValue
@@ -225,7 +272,11 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Contact Name *</FormLabel>
                   <FormControl>
-                    <Input capitalize {...field} />
+                    <Input
+                      capitalize
+                      {...field}
+                      placeholder="Enter your full name"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -239,7 +290,7 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Contact No *</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input {...field} placeholder="Enter your contact number" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -253,7 +304,11 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Email ID *</FormLabel>
                   <FormControl>
-                    <Input type="email" {...field} />
+                    <Input
+                      type="email"
+                      placeholder="Enter your email address"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -267,7 +322,12 @@ export function TicketFormPage() {
                 <FormItem className="md:col-span-2">
                   <FormLabel>Address *</FormLabel>
                   <FormControl>
-                    <Textarea rows={2} capitalize {...field} />
+                    <Textarea
+                      rows={2}
+                      capitalize
+                      placeholder="Enter your full address eg. street, city, state, zip code"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -281,7 +341,11 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Model</FormLabel>
                   <FormControl>
-                    <Input capitalize {...field} />
+                    <Input
+                      capitalize
+                      {...field}
+                      placeholder="Enter the model of product ( iPhone 13, Samsung )"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -295,7 +359,10 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Serial Number(s)</FormLabel>
                   <FormControl>
-                    <Input placeholder="Comma-separated if multiple" {...field} />
+                    <Input
+                      placeholder="Comma-separated if multiple"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -309,7 +376,12 @@ export function TicketFormPage() {
                 <FormItem className="md:col-span-2">
                   <FormLabel>Problem *</FormLabel>
                   <FormControl>
-                    <Textarea rows={3} capitalize {...field} />
+                    <Textarea
+                      placeholder="Describe the problem in detail"
+                      rows={3}
+                      capitalize
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -326,7 +398,10 @@ export function TicketFormPage() {
                     <Combobox
                       value={field.value}
                       onChange={field.onChange}
-                      options={options.accountManagers.map((a) => ({ value: a, label: a }))}
+                      options={options.accountManagers.map((a) => ({
+                        value: a,
+                        label: a,
+                      }))}
                       placeholder="Person in the office who handles the account"
                       searchPlaceholder="Search or type a name..."
                       allowCustomValue
@@ -347,7 +422,10 @@ export function TicketFormPage() {
                     <Combobox
                       value={field.value}
                       onChange={field.onChange}
-                      options={options.assignedBys.map((a) => ({ value: a, label: a }))}
+                      options={options.assignedBys.map((a) => ({
+                        value: a,
+                        label: a,
+                      }))}
                       placeholder="Person in the company who assigned this ticket"
                       searchPlaceholder="Search or type a name..."
                       allowCustomValue
@@ -396,7 +474,8 @@ export function TicketFormPage() {
                       options={(isAdmin
                         ? options.assignedToOptions
                         : options.assignedToOptions.filter(
-                            (emp) => emp.id === user?.id || emp.role === "employee"
+                            (emp) =>
+                              emp.id === user?.id || emp.role === "employee"
                           )
                       ).map((emp) => ({
                         value: String(emp.id),
@@ -484,9 +563,17 @@ export function TicketFormPage() {
 
           <div className="mt-6 flex gap-2">
             <Button type="submit" disabled={submitting}>
-              {submitting ? "Saving..." : isEdit ? "Save Changes" : "Create Ticket"}
+              {submitting
+                ? "Saving..."
+                : isEdit
+                ? "Save Changes"
+                : "Create Ticket"}
             </Button>
-            <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate(-1)}
+            >
               Cancel
             </Button>
           </div>

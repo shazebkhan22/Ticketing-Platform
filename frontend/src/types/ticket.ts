@@ -119,6 +119,14 @@ export interface Employee {
   role?: "admin" | "employee";
 }
 
+export interface CustomerDirectoryEntry {
+  name: string;
+  contactName: string | null;
+  contactNo: string | null;
+  emailId: string | null;
+  address: string | null;
+}
+
 export interface MetaOptions {
   modes: TicketMode[];
   callTypes: CallType[];
@@ -128,6 +136,7 @@ export interface MetaOptions {
   accountManagers: string[];
   assignedBys: string[];
   companyNames: string[];
+  customers: CustomerDirectoryEntry[];
   assignedToOptions: Employee[];
 }
 

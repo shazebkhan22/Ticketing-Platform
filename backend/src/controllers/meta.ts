@@ -34,9 +34,14 @@ export async function getOptions(_req: Request, res: Response) {
 
   // "Company Name" is free text and the same company can be typed slightly
   // differently across tickets — surface previously-used values so users can
-  // pick an existing spelling instead of creating a near-duplicate.
-  const companyNamesResult = await pool.query(
-    "SELECT DISTINCT company_name FROM tickets ORDER BY company_name"
+  // pick an existing spelling instead of creating a near-duplicate. Read from
+  // `customers`, not `DISTINCT company_name FROM tickets` — `customers` is
+  // the canonical per-company contact record (see getOrCreateCustomerId),
+  // and returning contact_name/contact_no/email_id/address alongside the
+  // name lets the ticket form auto-fill those fields when an existing
+  // company is selected, instead of only offering the name itself.
+  const customersResult = await pool.query(
+    "SELECT name, contact_name, contact_no, email_id, address FROM customers ORDER BY name"
   );
 
   res.json({
@@ -47,7 +52,14 @@ export async function getOptions(_req: Request, res: Response) {
     priorities: TICKET_PRIORITIES,
     accountManagers: accountManagersResult.rows.map((r) => r.account_manager),
     assignedBys: assignedByResult.rows.map((r) => r.assigned_by),
-    companyNames: companyNamesResult.rows.map((r) => r.company_name),
+    companyNames: customersResult.rows.map((r) => r.name),
+    customers: customersResult.rows.map((r) => ({
+      name: r.name,
+      contactName: r.contact_name,
+      contactNo: r.contact_no,
+      emailId: r.email_id,
+      address: r.address,
+    })),
     assignedToOptions: employeesResult.rows.map((r) => ({
       id: r.id,
       displayName: r.display_name,
