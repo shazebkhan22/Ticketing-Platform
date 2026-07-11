@@ -660,6 +660,26 @@ export async function getAnalytics(_req: Request, res: Response) {
     ORDER BY u.display_name
   `);
 
+  // These four are point-in-time composition breakdowns (not trended like
+  // `monthly` above) — ORDER BY the enum column itself rather than COUNT(*)
+  // so the pie/donut legend order matches each enum's declared order
+  // (e.g. P1..P4, Pending/In Progress/Closed) instead of shuffling by count.
+  const priorityResult = await pool.query(`
+    SELECT priority, COUNT(*) AS count FROM tickets GROUP BY priority ORDER BY priority
+  `);
+
+  const statusResult = await pool.query(`
+    SELECT status, COUNT(*) AS count FROM tickets GROUP BY status ORDER BY status
+  `);
+
+  const modeResult = await pool.query(`
+    SELECT mode, COUNT(*) AS count FROM tickets GROUP BY mode ORDER BY mode
+  `);
+
+  const internalTagResult = await pool.query(`
+    SELECT internal_tag, COUNT(*) AS count FROM tickets GROUP BY internal_tag ORDER BY internal_tag
+  `);
+
   res.json({
     monthly: monthlyResult.rows.map((r) => ({
       month: r.month,
@@ -675,6 +695,22 @@ export async function getAnalytics(_req: Request, res: Response) {
       pending: parseInt(r.pending, 10),
       inProgress: parseInt(r.in_progress, 10),
       closed: parseInt(r.closed, 10),
+    })),
+    byPriority: priorityResult.rows.map((r) => ({
+      priority: r.priority,
+      count: parseInt(r.count, 10),
+    })),
+    byStatus: statusResult.rows.map((r) => ({
+      status: r.status,
+      count: parseInt(r.count, 10),
+    })),
+    byMode: modeResult.rows.map((r) => ({
+      mode: r.mode,
+      count: parseInt(r.count, 10),
+    })),
+    byInternalTag: internalTagResult.rows.map((r) => ({
+      internalTag: r.internal_tag,
+      count: parseInt(r.count, 10),
     })),
   });
 }

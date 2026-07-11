@@ -83,10 +83,34 @@ export interface AnalyticsEmployeeStatus {
   closed: number;
 }
 
+export interface AnalyticsPriorityCount {
+  priority: TicketPriority;
+  count: number;
+}
+
+export interface AnalyticsStatusCount {
+  status: TicketStatus;
+  count: number;
+}
+
+export interface AnalyticsModeCount {
+  mode: TicketMode;
+  count: number;
+}
+
+export interface AnalyticsInternalTagCount {
+  internalTag: InternalTag;
+  count: number;
+}
+
 export interface Analytics {
   monthly: AnalyticsMonthlyPoint[];
   byCallType: AnalyticsCallTypeCount[];
   byEmployee: AnalyticsEmployeeStatus[];
+  byPriority: AnalyticsPriorityCount[];
+  byStatus: AnalyticsStatusCount[];
+  byMode: AnalyticsModeCount[];
+  byInternalTag: AnalyticsInternalTagCount[];
 }
 
 export interface Employee {
