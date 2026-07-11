@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
+    "preview-email": "tsx src/dev/previewEmail.ts",
     "test": "vitest run",
     "test:e2e": "vitest run -c vitest.e2e.config.ts"
   },

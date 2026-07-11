@@ -11,3 +11,4 @@ coverage/
 .vscode/
 .idea/
 docker-compose.override.yml
+backend/email-preview.html
