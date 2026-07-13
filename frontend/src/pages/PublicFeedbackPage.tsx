@@ -26,7 +26,7 @@ export function PublicFeedbackPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-neutral-50 p-4">
       <Card className="w-full max-w-md">
-        <CardContent className="space-y-4 p-6">
+        <CardContent className="space-y-4">
           {isLoading && (
             <div className="space-y-3">
               <Skeleton className="h-6 w-2/3" />
@@ -53,13 +53,13 @@ export function PublicFeedbackPage() {
             <>
               <div>
                 <h2 className="text-lg font-semibold text-neutral-800">How did we do?</h2>
-                <p className="text-sm text-neutral-500">
+                <p className="mt-2 text-sm text-neutral-500">
                   Ticket {data.ticketNo} for {data.companyName} was recently closed. We'd love to
                   hear your feedback.
                 </p>
               </div>
 
-              <div className="flex justify-center gap-1">
+              <div className="mb-4 flex justify-center gap-1">
                 {[1, 2, 3, 4, 5].map((value) => (
                   <button
                     key={value}
@@ -81,7 +81,8 @@ export function PublicFeedbackPage() {
                 placeholder="Any additional comments (optional)"
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                rows={4}
+                rows={5}
+                className="my-6"
               />
 
               <Button

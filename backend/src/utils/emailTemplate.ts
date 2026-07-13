@@ -19,7 +19,13 @@ export function renderEmailHtml(bodyText: string): string {
   return `
 <div style="font-family:Arial,Helvetica,sans-serif;margin:0 auto;padding:16px 0;color:#1f2937;max-width:600px;width:100%;background-color: #ffffff;border-radius: 12px;overflow: hidden;box-shadow: 0 6px 40px rgba(10, 40, 80, 0.13);">
   <div style="text-align:center;padding:0 28px;">
-    <img src="${LOGO_URL}" alt="Cygnus" style="height:40px;margin-top:24px;display:inline-block;" />
+    <img
+      src="${LOGO_URL}"
+      alt="Cygnus"
+      width="160"
+      height="auto"
+      style="width:160px;max-width:160px;height:auto;margin-top:24px;display:inline-block;border:0;outline:none;text-decoration:none;"
+    />
   </div>
   <div style="padding:24px;">
     ${paragraphs}
