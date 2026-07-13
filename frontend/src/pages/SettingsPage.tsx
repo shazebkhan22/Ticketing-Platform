@@ -59,7 +59,7 @@ export function SettingsPage() {
   return (
     <div className="max-w-2xl space-y-4">
       <div>
-        <h2 className="text-xl font-bold text-neutral-800">Settings</h2>
+        <h2 className="text-lg font-semibold text-neutral-800">Settings</h2>
         <p className="text-sm text-neutral-500 max-w-xl">
           Configure the SMTP server used to email customers (repair-complete and feedback
           requests) and employees.

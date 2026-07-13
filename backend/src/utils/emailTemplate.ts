@@ -1,15 +1,7 @@
-const LOGO_URL =
-  "https://res.cloudinary.com/duhhwugqb/image/upload/v1783410566/Cygnus_Exp_rl8ue3.png";
-
-// Derived from the seeded staff email domain (cygnussolutions.co.in) —
-// confirm this is the real public site before relying on it.
+const LOGO_URL ="https://res.cloudinary.com/duhhwugqb/image/upload/v1783410566/Cygnus_Exp_rl8ue3.png";
 const WEBSITE_URL = "https://www.cygnussolutions.co.in";
-// TODO: replace with the real company LinkedIn page URL — this is a
-// placeholder, not a confirmed link.
 const LINKEDIN_URL = "https://www.linkedin.com/company/cygnus-information-solutions-pvt-ltd-/posts/?feedView=all";
 
-// Wraps plain-text-style email bodies (using \n\n paragraph breaks) in a
-// minimal branded HTML shell so all outgoing mail shares the same look.
 export function renderEmailHtml(bodyText: string): string {
   const paragraphs = bodyText
     .split("\n\n")

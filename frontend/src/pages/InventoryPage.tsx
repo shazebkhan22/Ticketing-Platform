@@ -145,7 +145,7 @@ export function InventoryPage() {
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-neutral-800">Inventory</h2>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-neutral-500 max-w-xl">
           Track inward/outward movement and in-house vs. outsourced repair
           status for every product that's come in on a ticket.
         </p>

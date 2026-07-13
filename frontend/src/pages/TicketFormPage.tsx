@@ -34,7 +34,10 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Info } from "lucide-react";
 import { todayLocalDate } from "@/lib/ticket-utils";
+import { TICKET_FIELD_TOOLTIPS } from "@/constants/ticket";
 
 const EMPTY_FORM: TicketFormValues = {
   ticketDate: todayLocalDate(),
@@ -339,7 +342,17 @@ export function TicketFormPage() {
               name="model"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Model</FormLabel>
+                  <FormLabel className="flex items-center gap-1">
+                    Model
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 cursor-help text-primary" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {TICKET_FIELD_TOOLTIPS.Model}
+                      </TooltipContent>
+                    </Tooltip>
+                  </FormLabel>
                   <FormControl>
                     <Input
                       capitalize
@@ -357,7 +370,17 @@ export function TicketFormPage() {
               name="serialNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Serial Number(s)</FormLabel>
+                  <FormLabel className="flex items-center gap-1">
+                    Serial Number(s)
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 cursor-help text-primary" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {TICKET_FIELD_TOOLTIPS["Serial Number(s)"]}
+                      </TooltipContent>
+                    </Tooltip>
+                  </FormLabel>
                   <FormControl>
                     <Input
                       placeholder="Comma-separated if multiple"

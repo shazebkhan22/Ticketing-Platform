@@ -23,3 +23,13 @@ export const PRIORITY_LABELS: Record<TicketPriority, string> = {
   P3: "Medium priority",
   P4: "Low priority",
 };
+
+// Inventory only tracks tickets that have a serial number (see InventoryPage's
+// "Inventory only tracks tickets that have a serial number" empty state) —
+// these two fields are the ones that gate whether a ticket shows up there.
+const INVENTORY_VISIBILITY_HINT = "Leaving this part empty means it won't show up on the Inventory page.";
+
+export const TICKET_FIELD_TOOLTIPS = {
+  Model: INVENTORY_VISIBILITY_HINT,
+  "Serial Number(s)": INVENTORY_VISIBILITY_HINT,
+} as const;
