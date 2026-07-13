@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useActivity } from "@/hooks/useActivity";
+import { usePaginatedFilters, getTotalPages } from "@/hooks/usePaginatedFilters";
 import { formatDateTime } from "@/lib/ticket-utils";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PaginationFooter } from "@/components/PaginationFooter";
+import { TableSkeletonRows, TableEmptyRow } from "@/components/TableListStates";
 import {
   Table,
   TableBody,
@@ -15,16 +15,15 @@ import {
 } from "@/components/ui/table";
 import type { ActivityFilters } from "@/types/activity";
 
-const PAGE_SIZE = 10;
+const DEFAULT_FILTERS: ActivityFilters = { page: 1, pageSize: 10 };
 
 export function ActivityLogPage() {
-  const [page, setPage] = useState(1);
-  const filters: ActivityFilters = { page, pageSize: PAGE_SIZE };
+  const { filters, updateFilter, page, pageSize } = usePaginatedFilters(DEFAULT_FILTERS);
   const { data, isLoading } = useActivity(filters);
 
   const entries = data?.entries ?? [];
   const total = data?.total ?? 0;
-  const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  const totalPages = getTotalPages(total, pageSize);
 
   return (
     <div className="space-y-4">
@@ -49,19 +48,9 @@ export function ActivityLogPage() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={5}>
-                      <Skeleton className="h-6 w-full" />
-                    </TableCell>
-                  </TableRow>
-                ))
+                <TableSkeletonRows colSpan={5} rows={8} />
               ) : entries.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-sm text-neutral-500">
-                    No activity recorded yet.
-                  </TableCell>
-                </TableRow>
+                <TableEmptyRow colSpan={5} message="No activity recorded yet." />
               ) : (
                 entries.map((entry) => (
                   <TableRow key={entry.id}>
@@ -93,29 +82,15 @@ export function ActivityLogPage() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between text-sm text-neutral-500">
-        <span>
-          Page {page} of {totalPages} ({total} entries)
-        </span>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(p - 1, 1))}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
+      <PaginationFooter
+        currentCount={entries.length}
+        total={total}
+        itemLabel="entries"
+        page={page}
+        totalPages={totalPages}
+        onPrev={() => updateFilter("page", Math.max(page - 1, 1))}
+        onNext={() => updateFilter("page", Math.min(page + 1, totalPages))}
+      />
     </div>
   );
 }

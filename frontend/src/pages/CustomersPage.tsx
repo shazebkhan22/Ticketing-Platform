@@ -1,14 +1,13 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useCustomerList } from "@/hooks/useCustomers";
-import type { CustomerFilters } from "@/types/customer";
+import { usePaginatedFilters, getTotalPages } from "@/hooks/usePaginatedFilters";
 import { DEFAULT_FILTERS } from "@/constants/customers";
 import { formatDate } from "@/lib/ticket-utils";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PaginationFooter } from "@/components/PaginationFooter";
+import { TableSkeletonRows, TableEmptyRow } from "@/components/TableListStates";
 import {
   Table,
   TableBody,
@@ -19,21 +18,11 @@ import {
 } from "@/components/ui/table";
 
 export function CustomersPage() {
-  const [filters, setFilters] = useState<CustomerFilters>(DEFAULT_FILTERS);
+  const { filters, updateFilter, page, pageSize } = usePaginatedFilters(DEFAULT_FILTERS);
   const { data, isLoading } = useCustomerList(filters);
   const customers = data?.customers ?? [];
   const total = data?.total ?? 0;
-  const pageSize = filters.pageSize ?? 7;
-  const page = filters.page ?? 1;
-  const totalPages = Math.max(Math.ceil(total / pageSize), 1);
-
-  function updateFilter<K extends keyof CustomerFilters>(key: K, value: CustomerFilters[K]) {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-      page: key === "page" ? (value as number) : 1,
-    }));
-  }
+  const totalPages = getTotalPages(total, pageSize);
 
   return (
     <div className="space-y-4">
@@ -66,19 +55,9 @@ export function CustomersPage() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={5}>
-                      <Skeleton className="h-6 w-full" />
-                    </TableCell>
-                  </TableRow>
-                ))
+                <TableSkeletonRows colSpan={6} />
               ) : customers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-sm text-neutral-500">
-                    No customers found.
-                  </TableCell>
-                </TableRow>
+                <TableEmptyRow colSpan={6} message="No customers found." />
               ) : (
                 customers.map((c) => (
                   <TableRow key={c.id}>
@@ -113,32 +92,15 @@ export function CustomersPage() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between text-sm text-neutral-500">
-        <span>
-          Showing {customers.length} of {total} customers
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => updateFilter("page", page - 1)}
-          >
-            Prev
-          </Button>
-          <span>
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => updateFilter("page", page + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
+      <PaginationFooter
+        currentCount={customers.length}
+        total={total}
+        itemLabel="customers"
+        page={page}
+        totalPages={totalPages}
+        onPrev={() => updateFilter("page", Math.max(page - 1, 1))}
+        onNext={() => updateFilter("page", Math.min(page + 1, totalPages))}
+      />
     </div>
   );
 }

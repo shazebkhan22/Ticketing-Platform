@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useInventoryList, useUpdateInventory } from "@/hooks/useInventory";
+import { usePaginatedFilters, getTotalPages } from "@/hooks/usePaginatedFilters";
 import type {
-  InventoryFilters,
   InventoryItem,
   RepairLocation,
   EditFormState,
@@ -25,7 +25,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PaginationFooter } from "@/components/PaginationFooter";
+import { TableSkeletonRows, TableEmptyRow } from "@/components/TableListStates";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select,
@@ -61,7 +62,7 @@ function toFormState(item: InventoryItem): EditFormState {
 }
 
 export function InventoryPage() {
-  const [filters, setFilters] = useState<InventoryFilters>(DEFAULT_FILTERS);
+  const { filters, updateFilter, page, pageSize } = usePaginatedFilters(DEFAULT_FILTERS);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [form, setForm] = useState<EditFormState | null>(null);
 
@@ -70,20 +71,7 @@ export function InventoryPage() {
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
-  const pageSize = filters.pageSize ?? 7;
-  const page = filters.page ?? 1;
-  const totalPages = Math.max(Math.ceil(total / pageSize), 1);
-
-  function updateFilter<K extends keyof InventoryFilters>(
-    key: K,
-    value: InventoryFilters[K]
-  ) {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-      page: key === "page" ? (value as number) : 1,
-    }));
-  }
+  const totalPages = getTotalPages(total, pageSize);
 
   function openEdit(item: InventoryItem) {
     setEditingItem(item);
@@ -196,28 +184,15 @@ export function InventoryPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && (
-                <TableRow>
-                  <TableCell
-                    colSpan={10}
-                    className="py-3 text-center text-neutral-400"
-                  >
-                    <Skeleton className="h-6 w-full" />
-                  </TableCell>
-                </TableRow>
-              )}
-              {!isLoading && items.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={10}
-                    className="py-3 text-center text-neutral-400"
-                  >
-                    No products found. Inventory only tracks tickets that have a
-                    serial number.
-                  </TableCell>
-                </TableRow>
-              )}
-              {items.map((item) => (
+              {isLoading ? (
+                <TableSkeletonRows colSpan={10} />
+              ) : items.length === 0 ? (
+                <TableEmptyRow
+                  colSpan={10}
+                  message="No products found. Inventory only tracks tickets that have a serial number."
+                />
+              ) : (
+                items.map((item) => (
                 <TableRow key={item.srNo}>
                   <TableCell className="text-sm font-medium">
                     <Link
@@ -261,38 +236,22 @@ export function InventoryPage() {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between text-sm text-neutral-500">
-        <span>
-          Showing {items.length} of {total} items
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => updateFilter("page", page - 1)}
-          >
-            Prev
-          </Button>
-          <span>
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => updateFilter("page", page + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
+      <PaginationFooter
+        currentCount={items.length}
+        total={total}
+        itemLabel="items"
+        page={page}
+        totalPages={totalPages}
+        onPrev={() => updateFilter("page", Math.max(page - 1, 1))}
+        onNext={() => updateFilter("page", Math.min(page + 1, totalPages))}
+      />
 
       <Dialog
         open={editingItem !== null}
