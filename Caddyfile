@@ -1,0 +1,3 @@
+{$FRONTEND_ORIGIN} {
+	reverse_proxy frontend:80
+}

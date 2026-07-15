@@ -26,7 +26,7 @@ async function runFeedbackReminderSweep() {
     const token = generateFeedbackToken();
     const link = `${env.frontendOrigin}/feedback/${token}`;
 
-    const text = `Dear ${ticket.contact_name},\n\nYour ticket ${ticket.ticket_no} has recently been closed. We would greatly appreciate a moment of your time to share your feedback:\n${link}\n\nThank you for your continued trust in our services.\n\nBest regards,\nSupport Team`;
+    const text = `Dear ${ticket.contact_name},\n\nYour ticket ${ticket.ticket_no} has recently been closed. To help us improve our service quality, we kindly request your feedback on the support experience. Please rate your overall satisfaction on a scale of 1 to 5, where:\n1 – Very Dissatisfied\n2 – Dissatisfied\n3 – Neutral\n4 – Satisfied\n5 – Excellent\n\nYou may share your rating and any additional comments here:\n${link}\n\nThank you for choosing Cygnus. We appreciate your time and feedback.\n\nBest regards,\nSupport Team`;
 
     await sendMail({
       to: ticket.email_id,

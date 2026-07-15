@@ -24,6 +24,9 @@ RUN npm ci --omit=dev && apk del python3 make g++
 # bundled CLI (and its vulnerable transitive deps like tar/sigstore/picomatch,
 # unrelated to our app) shrinks the attack surface for free.
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
-COPY --from=build /app/dist ./dist
+COPY --from=build --chown=node:node /app/dist ./dist
+USER node
 EXPOSE 4000
-CMD ["node", "dist/server.js"]
+# Runs pending migrations before every start so schema changes ship
+# automatically with a redeploy instead of requiring a manual exec step.
+CMD ["sh", "-c", "node dist/db/migrate.js && node dist/server.js"]
