@@ -182,7 +182,7 @@ export async function upsertInventory(req: Request, res: Response) {
 
   let row = result.rows[0];
   if (shouldNotify && ticket.email_id) {
-    const text = `Dear ${ticket.contact_name},\n\n Greetings from the Cygnus Support Team.\n\nWe are writing to inform you that the reported issue has been successfully resolved, and the case is now being marked as closed from our end.\n\nCase Reference Number: ${ticket.ticket_no} \n\nYou may simply reply to this email with your rating and any additional comments you wish to share.\n\nIf you feel the issue has not been fully resolved or requires further attention, please let us know and we will be happy to assist you further.\n\nBest regards,\nSupport Team`;
+    const text = `Dear ${ticket.contact_name},\n\n Greetings from the Cygnus Support Team.\n\nWe are writing to inform you that the reported issue has been successfully resolved, and the case is now being marked as closed from our end.\n\nCase Reference Number: ${ticket.ticket_no} \n\nIf you feel the issue has not been fully resolved or requires further attention, please let us know and we will be happy to assist you further.\n\nBest regards,\nSupport Team`;
 
     const sent = await sendMail({
       to: ticket.email_id,
