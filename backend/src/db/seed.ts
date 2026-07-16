@@ -14,7 +14,7 @@ const SEED_USERS: SeedUser[] = [
   { username: "jitesh", password: PLACEHOLDER_PASSWORD, role: "admin", displayName: "Jitesh Malhotra", email: "jiteshm@cygnussolutions.co.in" },
   { username: "helpdesk", password: PLACEHOLDER_PASSWORD, role: "admin", displayName: "Help Desk", email: null },
   { username: "pranesh", password: PLACEHOLDER_PASSWORD, role: "employee", displayName: "Pranesh Kute", email: "praneshk@cygnussolutions.co.in" },
-  { username: "raghvendra", password: PLACEHOLDER_PASSWORD, role: "employee", displayName: "Raghvendra Mishra", email: "raghvendram@cygnussolutions.co.in" },
+  { username: "raghavendra", password: PLACEHOLDER_PASSWORD, role: "employee", displayName: "Raghavendra Mishra", email: "raghavendram@cygnussolutions.co.in" },
   { username: "manoj", password: PLACEHOLDER_PASSWORD, role: "employee", displayName: "Manoj Mohite", email: "manojm@cygnussolutions.co.in" },
 ];
 

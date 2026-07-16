@@ -163,7 +163,7 @@ Individual employee accounts — there is **no shared login**. Seeded once via `
 | `parmanand` | Parmanand Pandey | `admin` (also creates/gets assigned tickets like any employee) |
 | `jitesh` | Jitesh Malhotra | `employee` |
 | `pranesh` | Pranesh Kute | `employee` |
-| `raghvendra` | Raghvendra Mishra | `employee` |
+| `raghavendra` | Raghavendra Mishra | `employee` |
 | `manoj` | Manoj Mohite | `employee` |
 
 | Column | Type | Notes |
@@ -484,7 +484,7 @@ Returns every dropdown's valid values in one call — the frontend should call t
     { "id": 1, "displayName": "Parmanand Pandey", "role": "admin" },
     { "id": 2, "displayName": "Jitesh Malhotra", "role": "employee" },
     { "id": 3, "displayName": "Pranesh Kute", "role": "employee" },
-    { "id": 4, "displayName": "Raghvendra Mishra", "role": "employee" },
+    { "id": 4, "displayName": "Raghavendra Mishra", "role": "employee" },
     { "id": 5, "displayName": "Manoj Mohite", "role": "employee" }
   ]
 }
