@@ -72,3 +72,12 @@ export const feedbackSubmissionSchema = z.object({
   comment: z.string().max(1000, "Max 1000 characters").optional(),
 });
 export type FeedbackSubmissionValues = z.infer<typeof feedbackSubmissionSchema>;
+
+export const createUserSchema = z.object({
+  username: z.string().min(1, "Required").max(50),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  role: z.enum(["admin", "employee"]),
+  displayName: z.string().min(1, "Required").max(100),
+  email: z.string().email({ message: "Invalid email" }).optional().or(z.literal("")),
+});
+export type CreateUserValues = z.infer<typeof createUserSchema>;

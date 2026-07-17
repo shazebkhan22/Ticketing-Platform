@@ -6,6 +6,7 @@ import {
   HistoryIcon,
   BuildingIcon,
   SettingsIcon,
+  UsersIcon,
 } from "lucide-react";
 
 export const NAV_MAIN = [
@@ -21,6 +22,7 @@ export const NAV_ADMIN = [
   { title: "Customers", url: "/customers", icon: <BuildingIcon /> },
   {title: "Inventory", url: "/inventory", icon: <ListChecksIcon />},
   { title: "Analytics", url: "/analytics", icon: <LayoutDashboardIcon /> },
+  { title: "Employees", url: "/users", icon: <UsersIcon /> },
   { title: "Settings", url: "/settings", icon: <SettingsIcon /> },
 ];
 

@@ -43,6 +43,9 @@ const AnalyticsPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage }))
 );
+const UsersPage = lazy(() =>
+  import("@/pages/UsersPage").then((m) => ({ default: m.UsersPage }))
+);
 const PublicFeedbackPage = lazy(() =>
   import("@/pages/PublicFeedbackPage").then((m) => ({ default: m.PublicFeedbackPage }))
 );
@@ -89,6 +92,7 @@ function App() {
                     <Route path="/inventory" element={<InventoryPage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/users" element={<UsersPage />} />
                   </Route>
                 </Route>
               </Route>

@@ -146,7 +146,9 @@ export async function exportTickets(req: Request, res: Response) {
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const result = await pool.query(
     `SELECT t.*,
-      (SELECT array_agg(r.remark_date || ': ' || r.body ORDER BY r.created_at)
+      (SELECT array_agg(
+         r.remark_date || COALESCE(' (' || r.created_by || ')', '') || ': ' || r.body
+         ORDER BY r.created_at)
        FROM remarks r WHERE r.ticket_sr_no = t.sr_no) AS remarks_list,
       (SELECT string_agg(u.display_name, ', ' ORDER BY u.display_name)
        FROM ticket_assignees ta JOIN users u ON u.id = ta.user_id
