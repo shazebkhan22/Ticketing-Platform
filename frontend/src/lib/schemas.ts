@@ -50,7 +50,10 @@ export const changePasswordSchema = z
   });
 export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 
-export const ticketFeedbackSchema = z.string().max(50, "Max 50 characters");
+export const adminFeedbackResponseSchema = z
+  .string()
+  .min(1, "Required")
+  .max(800, "Max 800 characters");
 
 export const ticketRemarkSchema = z.string().trim().min(1, "Remark cannot be empty");
 

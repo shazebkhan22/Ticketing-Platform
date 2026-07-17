@@ -74,7 +74,11 @@ function rowToTicket(row: any) {
     priority: row.priority,
     deadlineDate: row.deadline_date,
     status: row.status,
-    feedback: row.feedback,
+    customerFeedbackRating: row.customer_feedback_rating,
+    customerFeedbackComment: row.customer_feedback_comment,
+    customerFeedbackSubmittedAt: row.customer_feedback_submitted_at,
+    adminFeedbackResponse: row.admin_feedback_response,
+    adminFeedbackRespondedAt: row.admin_feedback_responded_at,
     internalTag: row.internal_tag,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -517,38 +521,44 @@ export async function updateTicketStatus(req: Request, res: Response) {
   res.json(rowToTicket(ticket));
 }
 
-const feedbackSchema = z.object({
-  feedback: z.string().max(50),
+const adminFeedbackResponseSchema = z.object({
+  response: z.string().min(1).max(800),
 });
 
-export async function updateFeedback(req: Request, res: Response) {
+export async function updateAdminFeedbackResponse(req: Request, res: Response) {
   const srNo = parseInt(req.params.srNo, 10);
-  const parsed = feedbackSchema.safeParse(req.body);
+  const parsed = adminFeedbackResponseSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
-  const existing = await pool.query("SELECT status FROM tickets WHERE sr_no = $1", [srNo]);
+  const existing = await pool.query(
+    "SELECT customer_feedback_submitted_at FROM tickets WHERE sr_no = $1",
+    [srNo]
+  );
   if (existing.rows.length === 0) {
     return res.status(404).json({ error: "Ticket not found" });
   }
-  if (existing.rows[0].status !== "Closed") {
-    return res.status(400).json({ error: "Feedback can only be added once the ticket is Closed" });
+  if (!existing.rows[0].customer_feedback_submitted_at) {
+    return res
+      .status(400)
+      .json({ error: "Customer has not submitted feedback for this ticket yet" });
   }
 
   const result = await pool.query(
-    `UPDATE tickets SET feedback = $1 WHERE sr_no = $2 RETURNING *`,
-    [parsed.data.feedback, srNo]
+    `UPDATE tickets SET admin_feedback_response = $1, admin_feedback_responded_at = now()
+     WHERE sr_no = $2 RETURNING *`,
+    [parsed.data.response, srNo]
   );
   const ticket = result.rows[0];
 
   await logActivity({
     actorUserId: req.session.userId,
     actorName: req.session.username ?? "Unknown",
-    action: "Added feedback",
+    action: "Responded to customer feedback",
     ticketSrNo: ticket.sr_no,
     ticketNo: ticket.ticket_no,
-    details: parsed.data.feedback,
+    details: parsed.data.response,
   });
 
   res.json(rowToTicket(ticket));

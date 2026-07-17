@@ -90,7 +90,7 @@ export function UsersPage() {
                     <FormItem>
                       <FormLabel>Full Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Rajesh Kumar" {...field} />
+                        <Input placeholder="Enter your name" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -104,7 +104,7 @@ export function UsersPage() {
                     <FormItem>
                       <FormLabel>Username</FormLabel>
                       <FormControl>
-                        <Input autoComplete="off" {...field} />
+                        <Input autoComplete="off" placeholder="Enter your username" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -132,7 +132,7 @@ export function UsersPage() {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                        <Input type="password" autoComplete="new-password" {...field} />
+                        <Input type="password" autoComplete="new-password" placeholder="Enter your password" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

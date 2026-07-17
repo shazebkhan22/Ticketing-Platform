@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { isAxiosError } from "axios"
 import { cn } from "@/lib/utils"
 import { loginSchema, type LoginFormValues } from "@/lib/schemas"
 import { useAuth } from "@/hooks/useAuth"
@@ -32,8 +33,22 @@ export function LoginForm({
     try {
       await login(values.username, values.password)
       navigate("/")
-    } catch {
-      form.setError("root", { message: "Invalid username or password" })
+    } catch (err) {
+      if (isAxiosError(err)) {
+        if (!err.response) {
+          form.setError("root", {
+            message: "Internal server error. Try again shortly.",
+          })
+        } else if (err.response.status === 401) {
+          form.setError("root", { message: "Invalid username or password" })
+        } else {
+          form.setError("root", {
+            message: err.response.data?.error || "Something went wrong. Please try again.",
+          })
+        }
+      } else {
+        form.setError("root", { message: "Something went wrong. Please try again." })
+      }
     }
   }
 

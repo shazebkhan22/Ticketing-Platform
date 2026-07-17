@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { StarIcon } from "lucide-react";
 import {
-  ticketFeedbackSchema as feedbackSchema,
+  adminFeedbackResponseSchema,
   ticketRemarkSchema as remarkSchema,
 } from "@/lib/schemas";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import {
   useAddRemark,
   useTicketDetail,
-  useUpdateTicketFeedback,
+  useUpdateAdminFeedbackResponse,
   useUpdateTicketStatus,
 } from "@/hooks/useTickets";
 import type { TicketStatus } from "@/types/ticket";
@@ -17,7 +19,6 @@ import { STATUS_FLOW } from "@/constants/ticket";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDate, formatDateTime, formatDateTimeWithSeconds } from "@/lib/ticket-utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,13 +41,13 @@ export function TicketDetailPage() {
 
   const { data, isLoading } = useTicketDetail(ticketSrNo);
   const updateStatus = useUpdateTicketStatus(ticketSrNo);
-  const updateFeedback = useUpdateTicketFeedback(ticketSrNo);
+  const updateAdminFeedbackResponse = useUpdateAdminFeedbackResponse(ticketSrNo);
   const addRemarkMutation = useAddRemark(ticketSrNo);
 
   const [newRemark, setNewRemark] = useState("");
   const [remarkError, setRemarkError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [adminResponse, setAdminResponse] = useState<string | null>(null);
+  const [adminResponseError, setAdminResponseError] = useState<string | null>(null);
 
   if (isLoading || !data) {
     return (
@@ -59,7 +60,7 @@ export function TicketDetailPage() {
   }
 
   const { ticket, remarks } = data;
-  const feedbackValue = feedback ?? ticket.feedback ?? "";
+  const adminResponseValue = adminResponse ?? ticket.adminFeedbackResponse ?? "";
   const currentStatusIndex = STATUS_FLOW.indexOf(ticket.status);
   const canEdit = user?.role === "admin" || ticket.assignees.some((a) => a.id === user?.id);
 
@@ -80,15 +81,15 @@ export function TicketDetailPage() {
     toast.success(`Status changed to ${status}`);
   }
 
-  async function handleFeedbackSave() {
-    const parsed = feedbackSchema.safeParse(feedbackValue);
+  async function handleAdminResponseSave() {
+    const parsed = adminFeedbackResponseSchema.safeParse(adminResponseValue);
     if (!parsed.success) {
-      setFeedbackError(parsed.error.issues[0].message);
+      setAdminResponseError(parsed.error.issues[0].message);
       return;
     }
-    setFeedbackError(null);
-    await updateFeedback.mutateAsync(parsed.data);
-    toast.success("Feedback saved");
+    setAdminResponseError(null);
+    await updateAdminFeedbackResponse.mutateAsync(parsed.data);
+    toast.success("Response saved");
   }
 
   return (
@@ -190,36 +191,62 @@ export function TicketDetailPage() {
         </CardContent>
       </Card>
 
-      {ticket.status === "Closed" && (
+      {ticket.status === "Closed" && ticket.customerFeedbackSubmittedAt && (
         <Card className="mb-6">
           <CardContent>
-            <h3 className="mb-3 text-sm font-bold text-cygnus-700">Feedback From User</h3>
-            {canEdit ? (
-              <div className="no-print">
-                <div className="flex gap-2 items-center">
-                  <Input
-                    value={feedbackValue}
+            <h3 className="mb-3 text-sm font-bold text-cygnus-700">Customer Feedback</h3>
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((value) => (
+                <StarIcon
+                  key={value}
+                  className={cn(
+                    "h-6 w-6",
+                    value <= (ticket.customerFeedbackRating ?? 0)
+                      ? "fill-amber-400 text-amber-400"
+                      : "text-neutral-300"
+                  )}
+                />
+              ))}
+              <span className="ml-2 text-sm text-neutral-500">
+                {formatDateTime(ticket.customerFeedbackSubmittedAt)}
+              </span>
+            </div>
+            {ticket.customerFeedbackComment && (
+              <p className="mt-2 text-sm text-neutral-800">{ticket.customerFeedbackComment}</p>
+            )}
+
+            <div className="mt-5 border-t border-neutral-200 pt-4">
+              <h4 className="mb-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                Admin Response
+              </h4>
+              {canEdit ? (
+                <div className="no-print">
+                  <Textarea
+                    value={adminResponseValue}
                     onChange={(e) => {
-                      setFeedback(e.target.value);
-                      setFeedbackError(null);
+                      setAdminResponse(e.target.value);
+                      setAdminResponseError(null);
                     }}
-                    placeholder="e.g. 5/5"
-                    className="max-w-1/2"
-                    aria-invalid={Boolean(feedbackError)}
+                    rows={3}
+                    placeholder="Respond to the customer's feedback..."
+                    aria-invalid={Boolean(adminResponseError)}
                   />
+                  {adminResponseError && (
+                    <p className="mt-1 text-xs text-destructive">{adminResponseError}</p>
+                  )}
                   <Button
                     variant="outline"
-                    onClick={handleFeedbackSave}
-                    disabled={updateFeedback.isPending}
+                    onClick={handleAdminResponseSave}
+                    disabled={updateAdminFeedbackResponse.isPending}
+                    className="mt-2"
                   >
-                    Save
+                    {updateAdminFeedbackResponse.isPending ? "Saving..." : "Save Response"}
                   </Button>
                 </div>
-                {feedbackError && <p className="mt-1 text-xs text-destructive">{feedbackError}</p>}
-              </div>
-            ) : (
-              <p className="text-sm text-neutral-800">{feedbackValue || "-"}</p>
-            )}
+              ) : (
+                <p className="text-sm text-neutral-800">{adminResponseValue || "-"}</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

@@ -119,6 +119,14 @@ const ADDITIVE_MIGRATIONS = [
   `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS customer_feedback_comment TEXT`,
   `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS customer_feedback_submitted_at TIMESTAMPTZ`,
   `ALTER TABLE smtp_config ADD COLUMN IF NOT EXISTS from_name TEXT`,
+  // Admin's written response to the customer's submitted public feedback
+  // (customer_feedback_rating/comment above) — shown alongside it in
+  // TicketDetailPage, filled in by staff after reviewing the rating.
+  `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS admin_feedback_response TEXT`,
+  `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS admin_feedback_responded_at TIMESTAMPTZ`,
+  // "Feedback From User" removed: a manual free-text staff note, superseded
+  // by the customer_feedback_*/admin_feedback_* columns above.
+  `ALTER TABLE tickets DROP COLUMN IF EXISTS feedback`,
 ];
 
 async function migrate() {

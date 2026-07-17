@@ -21,6 +21,10 @@ const passwordSchema = z.object({
 export async function login(req: Request, res: Response) {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
+    req.log.warn(
+      { username: typeof req.body?.username === "string" ? req.body.username : undefined },
+      "Login rejected: missing or invalid username/password"
+    );
     return res.status(400).json({ error: "Username and password are required" });
   }
   const { username, password } = parsed.data;
@@ -31,11 +35,13 @@ export async function login(req: Request, res: Response) {
   );
   const user = result.rows[0];
   if (!user) {
+    req.log.warn({ username }, "Login failed: unknown username");
     return res.status(401).json({ error: "Invalid username or password" });
   }
 
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) {
+    req.log.warn({ username, userId: user.id }, "Login failed: incorrect password");
     return res.status(401).json({ error: "Invalid username or password" });
   }
 
@@ -51,6 +57,8 @@ export async function login(req: Request, res: Response) {
   req.session.role = user.role;
   req.session.displayName = user.display_name;
   req.session.email = user.email;
+
+  req.log.info({ username: user.username, userId: user.id, role: user.role }, "Login succeeded");
 
   res.json({
     id: user.id,

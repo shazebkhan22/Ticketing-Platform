@@ -11,10 +11,18 @@ import {
   useTicketList,
 } from "@/hooks/useTickets";
 import type { TicketFilters } from "@/types/ticket";
-import { SUMMARY_CARDS, ALL_FILTER_VALUE, DEFAULT_TICKET_FILTERS } from "@/constants/dashboard";
+import {
+  SUMMARY_CARDS,
+  ALL_FILTER_VALUE,
+  DEFAULT_TICKET_FILTERS,
+} from "@/constants/dashboard";
 import { PRIORITY_CLASSES, PRIORITY_LABELS } from "@/constants/ticket";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { formatDate, truncateChars } from "@/lib/ticket-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -119,10 +127,12 @@ export function DashboardPage() {
       if (result.failedCount === 0) {
         toast.success(`Imported ${result.created} ticket(s)`);
       } else if (result.created === 0) {
-        toast.error(`Import failed for all ${result.failedCount} row(s). First error: ${result.errors[0]?.error}`);
+        toast.error(
+          `Import failed for all ${result.failedCount} row(s). First error: ${result.errors[0]?.error}`,
+        );
       } else {
         toast.warning(
-          `Imported ${result.created} ticket(s), ${result.failedCount} row(s) failed. First error (row ${result.errors[0]?.row}): ${result.errors[0]?.error}`
+          `Imported ${result.created} ticket(s), ${result.failedCount} row(s) failed. First error (row ${result.errors[0]?.row}): ${result.errors[0]?.error}`,
         );
       }
     } catch {
@@ -130,7 +140,10 @@ export function DashboardPage() {
     }
   }
 
-  function updateFilter<K extends keyof TicketFilters>(key: K, value: TicketFilters[K]) {
+  function updateFilter<K extends keyof TicketFilters>(
+    key: K,
+    value: TicketFilters[K],
+  ) {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
@@ -139,13 +152,17 @@ export function DashboardPage() {
   }
 
   function updateSelectFilter(
-    key: "status" | "callType" | "accountManager" | "assignedBy" | "priority"
+    key: "status" | "callType" | "accountManager" | "assignedBy" | "priority",
   ) {
-    return (value: string) => updateFilter(key, value === ALL_FILTER_VALUE ? undefined : value);
+    return (value: string) =>
+      updateFilter(key, value === ALL_FILTER_VALUE ? undefined : value);
   }
 
   function updateAssigneeFilter(value: string) {
-    updateFilter("assigneeUserId", value === ALL_FILTER_VALUE ? undefined : Number(value));
+    updateFilter(
+      "assigneeUserId",
+      value === ALL_FILTER_VALUE ? undefined : Number(value),
+    );
   }
 
   const pageSize = filters.pageSize ?? 7;
@@ -157,15 +174,15 @@ export function DashboardPage() {
       <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-bold text-neutral-800">Dashboard</h2>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setExportConfirmOpen(true)}
-            disabled={exportMutation.isPending}
-          >
-            {exportMutation.isPending ? "Exporting..." : "Export"}
-          </Button>
           {isAdmin && (
             <>
+              <Button
+                variant="outline"
+                onClick={() => setExportConfirmOpen(true)}
+                disabled={exportMutation.isPending}
+              >
+                {exportMutation.isPending ? "Exporting..." : "Export"}
+              </Button>
               <Button
                 variant="outline"
                 onClick={handleDownloadTemplate}
@@ -189,7 +206,9 @@ export function DashboardPage() {
               />
             </>
           )}
-          <Button variant="default" onClick={() => navigate("/tickets/new")}>+ New Ticket</Button>
+          <Button variant="default" onClick={() => navigate("/tickets/new")}>
+            + New Ticket
+          </Button>
         </div>
       </div>
 
@@ -198,8 +217,8 @@ export function DashboardPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Export tickets to Excel?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will download an .xlsx file of every ticket matching your current filters
-              (not just the current page).
+              This will download an .xlsx file of every ticket matching your
+              current filters (not just the current page).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -217,16 +236,20 @@ export function DashboardPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Import tickets from "{pendingImportFile?.name}" ?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Import tickets from "{pendingImportFile?.name}" ?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This will create a new ticket for every valid row in the file. Rows that fail
-              validation will be skipped and reported — this cannot be undone in bulk, so make
-              sure this is the right file.
+              This will create a new ticket for every valid row in the file.
+              Rows that fail validation will be skipped and reported — this
+              cannot be undone in bulk, so make sure this is the right file.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmImport}>Import</AlertDialogAction>
+            <AlertDialogAction onClick={handleConfirmImport}>
+              Import
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -239,7 +262,11 @@ export function DashboardPage() {
                 {card.label}
               </div>
               <div className="text-3xl font-bold">
-                {summary ? summary[card.key] : <Skeleton className="h-7 w-10" />}
+                {summary ? (
+                  summary[card.key]
+                ) : (
+                  <Skeleton className="h-7 w-10" />
+                )}
               </div>
             </CardContent>
           </Card>
@@ -249,7 +276,9 @@ export function DashboardPage() {
       <Card className="mb-4">
         <CardContent className="flex flex-wrap gap-2">
           <div className="min-w-44 flex-1">
-            <label className="mb-1 block text-xs font-semibold text-neutral-500">Search</label>
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">
+              Search
+            </label>
             <Input
               placeholder="Company or ticket no."
               value={filters.search ?? ""}
@@ -257,8 +286,13 @@ export function DashboardPage() {
             />
           </div>
           <div className="min-w-14 flex-1">
-            <label className="mb-1 block text-xs font-semibold text-neutral-500">Status</label>
-            <Select value={filters.status ?? ALL_FILTER_VALUE} onValueChange={updateSelectFilter("status")}>
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">
+              Status
+            </label>
+            <Select
+              value={filters.status ?? ALL_FILTER_VALUE}
+              onValueChange={updateSelectFilter("status")}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -273,7 +307,9 @@ export function DashboardPage() {
             </Select>
           </div>
           <div className="min-w-20 flex-1">
-            <label className="mb-1 block text-xs font-semibold text-neutral-500">Call Type</label>
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">
+              Call Type
+            </label>
             <Select
               value={filters.callType ?? ALL_FILTER_VALUE}
               onValueChange={updateSelectFilter("callType")}
@@ -292,7 +328,9 @@ export function DashboardPage() {
             </Select>
           </div>
           <div className="min-w-20 flex-1">
-            <label className="mb-1 block text-xs font-semibold text-neutral-500">Priority</label>
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">
+              Priority
+            </label>
             <Select
               value={filters.priority ?? ALL_FILTER_VALUE}
               onValueChange={updateSelectFilter("priority")}
@@ -332,9 +370,15 @@ export function DashboardPage() {
             </Select>
           </div>
           <div className="min-w-20 flex-1">
-            <label className="mb-1 block text-xs font-semibold text-neutral-500">Assigned To</label>
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">
+              Assigned To
+            </label>
             <Select
-              value={filters.assigneeUserId ? String(filters.assigneeUserId) : ALL_FILTER_VALUE}
+              value={
+                filters.assigneeUserId
+                  ? String(filters.assigneeUserId)
+                  : ALL_FILTER_VALUE
+              }
               onValueChange={updateAssigneeFilter}
             >
               <SelectTrigger className="w-full">
@@ -372,7 +416,9 @@ export function DashboardPage() {
             </Select>
           </div>
           <div className="min-w-32 flex-1">
-            <label className="mb-1 block text-xs font-semibold text-neutral-500">From</label>
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">
+              From
+            </label>
             <DatePicker
               value={filters.dateFrom}
               onChange={(value) => updateFilter("dateFrom", value)}
@@ -414,14 +460,20 @@ export function DashboardPage() {
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={8} className="py-6 text-center text-neutral-400">
+                <TableCell
+                  colSpan={8}
+                  className="py-6 text-center text-neutral-400"
+                >
                   Loading...
                 </TableCell>
               </TableRow>
             )}
             {!isLoading && tickets.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="py-6 text-center text-neutral-400">
+                <TableCell
+                  colSpan={8}
+                  className="py-6 text-center text-neutral-400"
+                >
                   No tickets found.
                 </TableCell>
               </TableRow>
@@ -435,26 +487,40 @@ export function DashboardPage() {
                 <TableCell>{formatDate(t.ticketDate)}</TableCell>
                 <TableCell>{t.ticketNo}</TableCell>
                 <TableCell>{truncateChars(t.companyName, 13)}</TableCell>
-                <TableCell className="max-w-56 truncate whitespace-normal">{truncateChars(t.problem, 15)}</TableCell>
+                <TableCell className="max-w-56 truncate whitespace-normal">
+                  {truncateChars(t.problem, 15)}
+                </TableCell>
                 <TableCell>{t.assignedBy}</TableCell>
-                <TableCell>{truncateChars(t.assignees.map((a) => a.displayName).join(", "), 18)}</TableCell>
+                <TableCell>
+                  {truncateChars(
+                    t.assignees.map((a) => a.displayName).join(", "),
+                    18,
+                  )}
+                </TableCell>
                 <TableCell>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Badge
                         variant="secondary"
-                        className={cn("rounded-full", PRIORITY_CLASSES[t.priority])}
+                        className={cn(
+                          "rounded-full",
+                          PRIORITY_CLASSES[t.priority],
+                        )}
                       >
                         {t.priority}
                       </Badge>
                     </TooltipTrigger>
-                    <TooltipContent>{PRIORITY_LABELS[t.priority]}</TooltipContent>
+                    <TooltipContent>
+                      {PRIORITY_LABELS[t.priority]}
+                    </TooltipContent>
                   </Tooltip>
                 </TableCell>
                 <TableCell>
                   <StatusBadge ticket={t} />
                 </TableCell>
-                <TableCell className="text-neutral-500">{formatDate(t.updatedAt)}</TableCell>
+                <TableCell className="text-neutral-500">
+                  {formatDate(t.updatedAt)}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

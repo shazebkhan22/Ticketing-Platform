@@ -36,7 +36,11 @@ export interface Ticket {
   priority: TicketPriority;
   deadlineDate: string | null;
   status: TicketStatus;
-  feedback: string | null;
+  customerFeedbackRating: number | null;
+  customerFeedbackComment: string | null;
+  customerFeedbackSubmittedAt: string | null;
+  adminFeedbackResponse: string | null;
+  adminFeedbackRespondedAt: string | null;
   internalTag: InternalTag;
   createdAt: string;
   updatedAt: string;

@@ -8,7 +8,7 @@ import {
   createTicket,
   updateTicket,
   updateTicketStatus,
-  updateFeedback,
+  updateAdminFeedbackResponse,
   deleteTicket,
   addRemark,
   getAnalytics,
@@ -47,6 +47,11 @@ ticketsRouter.post("/", createTicket);
 // membership in ticket_assignees against the session) — not whoever created it.
 ticketsRouter.put("/:srNo", validateSrNoParam, requireAssigneeOrAdmin, updateTicket);
 ticketsRouter.patch("/:srNo/status", validateSrNoParam, requireAssigneeOrAdmin, updateTicketStatus);
-ticketsRouter.patch("/:srNo/feedback", validateSrNoParam, requireAssigneeOrAdmin, updateFeedback);
+ticketsRouter.patch(
+  "/:srNo/admin-feedback-response",
+  validateSrNoParam,
+  requireAssigneeOrAdmin,
+  updateAdminFeedbackResponse
+);
 ticketsRouter.delete("/:srNo", validateSrNoParam, requireAssigneeOrAdmin, deleteTicket);
 ticketsRouter.post("/:srNo/remarks", validateSrNoParam, requireAssigneeOrAdmin, addRemark);

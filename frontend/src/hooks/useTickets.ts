@@ -11,8 +11,8 @@ import {
   fetchTicket,
   fetchTickets,
   importTickets,
+  updateAdminFeedbackResponse,
   updateTicket,
-  updateTicketFeedback,
   updateTicketStatus,
 } from "@/api/tickets";
 import type { TicketFilters, TicketFormInput } from "@/types/ticket";
@@ -95,10 +95,10 @@ export function useUpdateTicketStatus(srNo: number) {
   });
 }
 
-export function useUpdateTicketFeedback(srNo: number) {
+export function useUpdateAdminFeedbackResponse(srNo: number) {
   const invalidate = useInvalidateTicket(srNo);
   return useMutation({
-    mutationFn: (feedback: string) => updateTicketFeedback(srNo, feedback),
+    mutationFn: (response: string) => updateAdminFeedbackResponse(srNo, response),
     onSuccess: invalidate,
   });
 }

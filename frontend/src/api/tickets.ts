@@ -88,8 +88,10 @@ export async function updateTicketStatus(srNo: number, status: string): Promise<
   return data;
 }
 
-export async function updateTicketFeedback(srNo: number, feedback: string): Promise<Ticket> {
-  const { data } = await apiClient.patch<Ticket>(`/tickets/${srNo}/feedback`, { feedback });
+export async function updateAdminFeedbackResponse(srNo: number, response: string): Promise<Ticket> {
+  const { data } = await apiClient.patch<Ticket>(`/tickets/${srNo}/admin-feedback-response`, {
+    response,
+  });
   return data;
 }
 

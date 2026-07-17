@@ -34,15 +34,20 @@ const COLUMNS = [
   { header: "Priority", key: "priority", width: 10 },
   { header: "Deadline Date", key: "deadlineDate", width: 14 },
   { header: "Status", key: "status", width: 12 },
-  { header: "Feedback From User", key: "feedback", width: 24 },
   { header: "Internal Tag", key: "internalTag", width: 12 },
 ] as const;
 
-// Export-only — full remark history doesn't belong in the import template
-// (a re-imported file always creates new tickets, it can't carry remarks
-// into them). Appended after COLUMNS purely for display; import ignores any
-// header it doesn't recognize, so a re-imported export is unaffected.
-const UPDATE_COLUMNS = [{ header: "Remarks", key: "remarks", width: 50 }] as const;
+// Export-only — full remark history and post-close feedback don't belong in
+// the import template (a re-imported file always creates new tickets, none
+// of this can carry over into them). Appended after COLUMNS purely for
+// display; import ignores any header it doesn't recognize, so a
+// re-imported export is unaffected.
+const UPDATE_COLUMNS = [
+  { header: "Remarks", key: "remarks", width: 26 },
+  { header: "Customer Rating", key: "customerFeedbackRating", width: 16 },
+  { header: "Customer Feedback", key: "customerFeedbackComment", width: 20 },
+  { header: "Admin Feedback", key: "adminFeedbackResponse", width: 20 },
+] as const;
 
 function excelDateToIso(value: unknown): string | undefined {
   if (value === null || value === undefined || value === "") return undefined;
@@ -147,7 +152,8 @@ export async function exportTickets(req: Request, res: Response) {
   const result = await pool.query(
     `SELECT t.*,
       (SELECT array_agg(
-         r.remark_date || COALESCE(' (' || r.created_by || ')', '') || ': ' || r.body
+         r.remark_date || ' ' || to_char(r.created_at, 'HH24:MI')
+           || COALESCE(' (' || r.created_by || ')', '') || ': ' || r.body
          ORDER BY r.created_at)
        FROM remarks r WHERE r.ticket_sr_no = t.sr_no) AS remarks_list,
       (SELECT string_agg(u.display_name, ', ' ORDER BY u.display_name)
@@ -193,9 +199,11 @@ export async function exportTickets(req: Request, res: Response) {
         priority: row.priority,
         deadlineDate: row.deadline_date,
         status: row.status,
-        feedback: row.feedback,
         internalTag: row.internal_tag,
         remarks: remarksList.length > 0 ? remarksList[remarksList.length - 1] : "",
+        customerFeedbackRating: row.customer_feedback_rating ?? "",
+        customerFeedbackComment: row.customer_feedback_comment ?? "",
+        adminFeedbackResponse: row.admin_feedback_response ?? "",
       })
     );
 
@@ -255,7 +263,6 @@ export async function downloadImportTemplate(_req: Request, res: Response) {
     priority: "P3",
     deadlineDate: "2026-01-22",
     status: "Pending",
-    feedback: "",
     internalTag: "External",
   });
 
@@ -320,7 +327,6 @@ const importRowSchema = z.object({
   priority: z.enum(TICKET_PRIORITIES).optional(),
   deadlineDate: z.string().optional(),
   status: z.enum(TICKET_STATUSES).optional(),
-  feedback: z.string().max(50).optional(),
   internalTag: z.enum(INTERNAL_TAGS).optional(),
 });
 
@@ -417,7 +423,6 @@ export async function importTickets(req: Request, res: Response) {
       priority: cellToString(raw.priority),
       deadlineDate: excelDateToIso(raw.deadlineDate),
       status: cellToString(raw.status),
-      feedback: cellToString(raw.feedback),
       internalTag: cellToString(raw.internalTag),
     };
 
@@ -463,8 +468,8 @@ export async function importTickets(req: Request, res: Response) {
         `INSERT INTO tickets (
           ticket_no, ticket_date, mode, customer_id, company_name, contact_name, contact_no, email_id, address,
           model, serial_number, problem, owner_user_id, account_manager, assigned_by, call_type,
-          priority, deadline_date, status, feedback, internal_tag
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+          priority, deadline_date, status, internal_tag
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
         RETURNING sr_no`,
         [
           ticketNo,
@@ -486,7 +491,6 @@ export async function importTickets(req: Request, res: Response) {
           d.priority ?? "P3",
           d.deadlineDate || null,
           d.status ?? "Pending",
-          d.feedback || null,
           d.internalTag ?? "External",
         ]
       );

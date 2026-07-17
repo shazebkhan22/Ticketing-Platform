@@ -59,7 +59,6 @@ CREATE TABLE tickets (
   -- feature, removed; may be reintroduced later as its own thing).
   deadline_date DATE,
   status ticket_status NOT NULL DEFAULT 'Pending',
-  feedback TEXT,
   internal_tag internal_tag NOT NULL DEFAULT 'External',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -71,7 +70,10 @@ CREATE TABLE tickets (
   feedback_requested_at TIMESTAMPTZ,
   customer_feedback_rating SMALLINT,
   customer_feedback_comment TEXT,
-  customer_feedback_submitted_at TIMESTAMPTZ
+  customer_feedback_submitted_at TIMESTAMPTZ,
+  -- Staff's written response to the customer's rating/comment above.
+  admin_feedback_response TEXT,
+  admin_feedback_responded_at TIMESTAMPTZ
 );
 
 CREATE INDEX idx_tickets_customer_id ON tickets(customer_id);
