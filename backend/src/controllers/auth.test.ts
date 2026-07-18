@@ -22,6 +22,10 @@ function mockReq(body: unknown): Request {
     session: {
       regenerate: (cb: (err?: unknown) => void) => cb(),
     },
+    log: {
+      warn: vi.fn(),
+      info: vi.fn(),
+    },
   } as unknown as Request;
 }
 
