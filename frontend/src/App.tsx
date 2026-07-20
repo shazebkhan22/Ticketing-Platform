@@ -49,6 +49,12 @@ const UsersPage = lazy(() =>
 const PublicFeedbackPage = lazy(() =>
   import("@/pages/PublicFeedbackPage").then((m) => ({ default: m.PublicFeedbackPage }))
 );
+const ForgotPasswordPage = lazy(() =>
+  import("@/pages/ForgotPasswordPage").then((m) => ({ default: m.ForgotPasswordPage }))
+);
+const ResetPasswordPage = lazy(() =>
+  import("@/pages/ResetPasswordPage").then((m) => ({ default: m.ResetPasswordPage }))
+);
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -76,6 +82,8 @@ function App() {
           <Suspense fallback={<PageFallback />}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
               <Route path="/feedback/:token" element={<PublicFeedbackPage />} />
               <Route element={<ProtectedRoute />}>
                 <Route element={<SidebarLayout />}>

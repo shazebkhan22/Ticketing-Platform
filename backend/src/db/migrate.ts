@@ -127,6 +127,9 @@ const ADDITIVE_MIGRATIONS = [
   // "Feedback From User" removed: a manual free-text staff note, superseded
   // by the customer_feedback_*/admin_feedback_* columns above.
   `ALTER TABLE tickets DROP COLUMN IF EXISTS feedback`,
+  // Forgot-password flow. Only a hash of the token is stored — see schema.sql.
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token_hash TEXT`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires_at TIMESTAMPTZ`,
 ];
 
 async function migrate() {

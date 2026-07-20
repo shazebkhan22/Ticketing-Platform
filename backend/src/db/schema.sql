@@ -17,7 +17,12 @@ CREATE TABLE users (
   role user_role NOT NULL DEFAULT 'employee',
   display_name TEXT,
   email TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Forgot-password flow: only a SHA-256 hash of the reset token is stored
+  -- (never the raw token) so a DB leak alone can't be used to reset an
+  -- account — the raw token only ever exists in the emailed link.
+  password_reset_token_hash TEXT,
+  password_reset_expires_at TIMESTAMPTZ
 );
 
 -- One row per distinct company a ticket has ever been logged for — created
