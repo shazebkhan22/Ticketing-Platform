@@ -219,9 +219,10 @@ export function TicketDetailPage() {
               <h4 className="mb-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
                 Admin Response
               </h4>
-              {canEdit ? (
+              {user?.role === "admin" ? (
                 <div className="no-print">
                   <Textarea
+                    capitalize
                     value={adminResponseValue}
                     onChange={(e) => {
                       setAdminResponse(e.target.value);

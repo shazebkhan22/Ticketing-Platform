@@ -18,7 +18,7 @@ export const authRouter = Router();
 // both failed and successful attempts count against it.
 const loginLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  limit: 10,
+  limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many login attempts. Please try again later." },

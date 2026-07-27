@@ -47,10 +47,12 @@ ticketsRouter.post("/", createTicket);
 // membership in ticket_assignees against the session) — not whoever created it.
 ticketsRouter.put("/:srNo", validateSrNoParam, requireAssigneeOrAdmin, updateTicket);
 ticketsRouter.patch("/:srNo/status", validateSrNoParam, requireAssigneeOrAdmin, updateTicketStatus);
+// Admin-only, unlike the other write routes above — this is a formal reply
+// to the customer's feedback, not day-to-day ticket work any assignee does.
 ticketsRouter.patch(
   "/:srNo/admin-feedback-response",
   validateSrNoParam,
-  requireAssigneeOrAdmin,
+  requireAdmin,
   updateAdminFeedbackResponse
 );
 ticketsRouter.delete("/:srNo", validateSrNoParam, requireAssigneeOrAdmin, deleteTicket);
