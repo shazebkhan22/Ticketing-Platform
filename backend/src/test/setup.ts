@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { execFileSync } from "child_process";
 import { Client } from "pg";
 import bcrypt from "bcrypt";
 import { beforeAll, afterAll } from "vitest";
@@ -27,6 +28,23 @@ beforeAll(async () => {
 
   const schemaSql = fs.readFileSync(path.join(__dirname, "../db/schema.sql"), "utf-8");
   await client.query(schemaSql);
+
+  // schema.sql is the frozen, no-longer-maintained baseline (see the
+  // baseline migration's comment) — every schema change since then only
+  // exists as a node-pg-migrate migration, so the test DB isn't actually
+  // representative of prod/dev without also running these, same two-step
+  // sequence the production Dockerfile uses. Shelled out (not the
+  // programmatic API) because this project's moduleResolution can't resolve
+  // node-pg-migrate's package exports.
+  execFileSync(
+    process.execPath,
+    [require.resolve("node-pg-migrate/bin/node-pg-migrate"), "up", "--verbose", "false"],
+    {
+      cwd: path.join(__dirname, "../.."),
+      env: { ...process.env },
+      stdio: "pipe",
+    }
+  );
 
   const passwordHash = await bcrypt.hash(TEST_ADMIN.password, 12);
   await client.query(
