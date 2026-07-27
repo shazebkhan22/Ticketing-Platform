@@ -57,7 +57,7 @@ export async function listInventory(req: Request, res: Response) {
     pageSize = "7",
   } = req.query as Record<string, string>;
 
-  const conditions: string[] = [`t.serial_number IS NOT NULL`, `t.serial_number <> ''`];
+  const conditions: string[] = [`t.deleted_at IS NULL`, `t.serial_number IS NOT NULL`, `t.serial_number <> ''`];
   const params: any[] = [];
 
   if (search) {
@@ -140,7 +140,7 @@ export async function upsertInventory(req: Request, res: Response) {
   }
 
   const ticketResult = await pool.query(
-    "SELECT sr_no, ticket_no, company_name, contact_name, email_id FROM tickets WHERE sr_no = $1",
+    "SELECT sr_no, ticket_no, company_name, contact_name, email_id FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
     [srNo]
   );
   if (ticketResult.rows.length === 0) {

@@ -46,6 +46,7 @@ export interface Ticket {
   updatedAt: string;
   closedAt: string | null;
   lastRemark?: string;
+  rowVersion: number;
 }
 
 export interface Remark {

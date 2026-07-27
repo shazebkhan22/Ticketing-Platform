@@ -67,6 +67,27 @@ describe("login", () => {
     expect(res.status).toHaveBeenCalledWith(401);
   });
 
+  it("rejects a deactivated account with 401, even with the correct password", async () => {
+    vi.mocked(pool.query).mockResolvedValueOnce({
+      rows: [
+        {
+          id: 1,
+          username: "alice",
+          password_hash: passwordHash,
+          role: "employee",
+          is_active: false,
+        },
+      ],
+    } as any);
+    const req = mockReq({ username: "alice", password: "correct-password" });
+    const res = mockRes();
+
+    await login(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(req.session.userId).toBeUndefined();
+  });
+
   it("logs in successfully and populates the session", async () => {
     vi.mocked(pool.query).mockResolvedValueOnce({
       rows: [
@@ -77,6 +98,7 @@ describe("login", () => {
           role: "employee",
           display_name: "Alice",
           email: "alice@example.com",
+          is_active: true,
         },
       ],
     } as any);

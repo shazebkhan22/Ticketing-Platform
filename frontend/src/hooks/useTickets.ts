@@ -15,7 +15,7 @@ import {
   updateTicket,
   updateTicketStatus,
 } from "@/api/tickets";
-import type { TicketFilters, TicketFormInput } from "@/types/ticket";
+import type { TicketDetail, TicketFilters, TicketFormInput } from "@/types/ticket";
 
 export const ticketKeys = {
   all: ["tickets"] as const,
@@ -81,8 +81,19 @@ export function useCreateTicket() {
 
 export function useUpdateTicket(srNo: number) {
   const invalidate = useInvalidateTicket(srNo);
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: Partial<TicketFormInput>) => updateTicket(srNo, input),
+    mutationFn: (input: Partial<TicketFormInput>) => {
+      // rowVersion isn't a form field — it's read from whatever this ticket's
+      // detail query last fetched, so the backend can detect if someone else
+      // changed it in the meantime (see controllers/tickets.ts updateTicket).
+      const cached = queryClient.getQueryData<TicketDetail>(ticketKeys.detail(srNo));
+      const rowVersion = cached?.ticket.rowVersion;
+      if (rowVersion === undefined) {
+        throw new Error("Cannot update: current ticket version is unknown. Please refresh and try again.");
+      }
+      return updateTicket(srNo, input, rowVersion);
+    },
     onSuccess: invalidate,
   });
 }

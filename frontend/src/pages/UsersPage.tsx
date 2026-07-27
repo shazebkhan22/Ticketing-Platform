@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { useUsers, useCreateUser } from "@/hooks/useUsers";
+import { useUsers, useCreateUser, useSetUserActive } from "@/hooks/useUsers";
+import { useAuth } from "@/hooks/useAuth";
 import { createUserSchema, type CreateUserValues } from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -32,9 +34,23 @@ import {
 import { PlusCircleIcon } from "lucide-react";
 
 export function UsersPage() {
+  const { user: currentUser } = useAuth();
   const { data: users, isLoading } = useUsers();
   const createMutation = useCreateUser();
+  const setActiveMutation = useSetUserActive();
   const [open, setOpen] = useState(false);
+
+  async function handleToggleActive(id: number, isActive: boolean) {
+    try {
+      await setActiveMutation.mutateAsync({ id, isActive: !isActive });
+      toast.success(!isActive ? "Employee reactivated" : "Employee deactivated");
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        "Failed to update employee status";
+      toast.error(typeof message === "string" ? message : "Failed to update employee status");
+    }
+  }
 
   const form = useForm<CreateUserValues>({
     resolver: zodResolver(createUserSchema),
@@ -185,6 +201,8 @@ export function UsersPage() {
                 <th className="pb-2 font-medium">Username</th>
                 <th className="pb-2 font-medium">Email</th>
                 <th className="pb-2 font-medium">Role</th>
+                <th className="pb-2 font-medium">Status</th>
+                <th className="pb-2 font-medium"></th>
               </tr>
             </thead>
             <tbody>
@@ -194,6 +212,23 @@ export function UsersPage() {
                   <td className="py-2 text-neutral-600">{u.username}</td>
                   <td className="py-2 text-neutral-600">{u.email || "—"}</td>
                   <td className="py-2 capitalize text-neutral-600">{u.role}</td>
+                  <td className="py-2">
+                    <Badge variant={u.isActive ? "secondary" : "destructive"}>
+                      {u.isActive ? "Active" : "Deactivated"}
+                    </Badge>
+                  </td>
+                  <td className="py-2 text-right">
+                    {u.id !== currentUser?.id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={setActiveMutation.isPending}
+                        onClick={() => handleToggleActive(u.id, u.isActive)}
+                      >
+                        {u.isActive ? "Deactivate" : "Reactivate"}
+                      </Button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

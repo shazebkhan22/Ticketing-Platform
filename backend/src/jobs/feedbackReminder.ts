@@ -14,7 +14,8 @@ async function runFeedbackReminderSweep() {
   const result = await pool.query(
     `SELECT sr_no, ticket_no, company_name,contact_name, email_id
      FROM tickets
-     WHERE status = 'Closed'
+     WHERE deleted_at IS NULL
+       AND status = 'Closed'
        AND closed_at IS NOT NULL
        AND closed_at <= now() - interval '24 hours'
        AND feedback_requested_at IS NULL

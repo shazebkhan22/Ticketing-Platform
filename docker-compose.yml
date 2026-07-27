@@ -1,12 +1,34 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    # Debian-based, not -alpine: Alpine's musl libc has subtly different
+    # collation/locale behavior from glibc (what managed hosts like RDS/Cloud
+    # SQL use), which can affect text sort order in edge cases. Using the
+    # same base here as production avoids a dev/prod mismatch surfacing as a
+    # confusing sort-order bug later.
+    image: postgres:16
     container_name: cygnus_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: cygnus
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: cygnus_ticketing
+    # Baseline tuning for a small container (~2GB RAM budget for Postgres) —
+    # adjust to your actual host's resources (see pgtune.leopard.in.ua for a
+    # calculator). Untuned defaults (128MB shared_buffers, 4GB
+    # effective_cache_size assumption) are sized for a generic install, not
+    # this container's real allocation.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - effective_cache_size=1536MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - max_connections=100
     ports:
       - "5432:5432"
     volumes:

@@ -1,11 +1,32 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    # Debian-based, not -alpine: Alpine's musl libc has subtly different
+    # collation/locale behavior from glibc (what managed hosts like RDS/Cloud
+    # SQL use) — matching dev avoids a mismatch surfacing as a confusing
+    # sort-order bug later.
+    image: postgres:16
     restart: unless-stopped
     environment:
       POSTGRES_USER: cygnus
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
       POSTGRES_DB: cygnus_ticketing
+    # Baseline tuning for a small host (~2GB RAM budget for Postgres) —
+    # adjust to your actual server's resources (see pgtune.leopard.in.ua for
+    # a calculator). Untuned defaults (128MB shared_buffers, 4GB
+    # effective_cache_size assumption) are sized for a generic install, not
+    # this container's real allocation.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - effective_cache_size=1536MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - max_connections=100
     volumes:
       - cygnus_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -13,6 +34,33 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Nightly pg_dump with automatic rotation (7 daily / 4 weekly / 6 monthly),
+  # written to the cygnus_pg_backups volume. This was previously entirely
+  # absent — a host failure would have meant total, permanent data loss.
+  # IMPORTANT: a backup sitting on the same host as the database it backs up
+  # only protects against DB-level corruption/mistakes, not host failure —
+  # copy cygnus_pg_backups off-host on a schedule (S3, Backblaze, etc.) once
+  # you have a destination for it. This container is the missing first half
+  # (the backups actually being taken); off-host sync is the second half.
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: cygnus_ticketing
+      POSTGRES_USER: cygnus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+      HEALTHCHECK_PORT: 8080
+    volumes:
+      - cygnus_pg_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   backend:
     build: ./backend
@@ -51,5 +99,6 @@ services:
 
 volumes:
   cygnus_pg_data:
+  cygnus_pg_backups:
   cygnus_caddy_data:
   cygnus_caddy_config:

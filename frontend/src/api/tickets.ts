@@ -77,9 +77,10 @@ export async function createTicket(input: TicketFormInput): Promise<Ticket> {
 
 export async function updateTicket(
   srNo: number,
-  input: Partial<TicketFormInput>
+  input: Partial<TicketFormInput>,
+  rowVersion: number
 ): Promise<Ticket> {
-  const { data } = await apiClient.put<Ticket>(`/tickets/${srNo}`, input);
+  const { data } = await apiClient.put<Ticket>(`/tickets/${srNo}`, { ...input, rowVersion });
   return data;
 }
 

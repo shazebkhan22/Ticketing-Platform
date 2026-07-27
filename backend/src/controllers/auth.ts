@@ -46,7 +46,7 @@ export async function login(req: Request, res: Response) {
   const { username, password } = parsed.data;
 
   const result = await pool.query(
-    "SELECT id, username, password_hash, role, display_name, email FROM users WHERE username = $1",
+    "SELECT id, username, password_hash, role, display_name, email, is_active FROM users WHERE username = $1",
     [username]
   );
   const user = result.rows[0];
@@ -58,6 +58,14 @@ export async function login(req: Request, res: Response) {
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) {
     req.log.warn({ username, userId: user.id }, "Login failed: incorrect password");
+    return res.status(401).json({ error: "Invalid username or password" });
+  }
+
+  // Deactivated accounts fail the same generic way as a bad password —
+  // distinguishing "wrong password" from "account disabled" would let
+  // someone probing usernames tell active accounts from deactivated ones.
+  if (!user.is_active) {
+    req.log.warn({ username, userId: user.id }, "Login failed: account is deactivated");
     return res.status(401).json({ error: "Invalid username or password" });
   }
 
@@ -97,11 +105,14 @@ export async function getMe(req: Request, res: Response) {
     return res.status(401).json({ error: "Not authenticated" });
   }
   const result = await pool.query(
-    "SELECT id, username, role, display_name, email FROM users WHERE id = $1",
+    "SELECT id, username, role, display_name, email FROM users WHERE id = $1 AND is_active = true",
     [req.session.userId]
   );
   const user = result.rows[0];
   if (!user) {
+    // Also covers a user deactivated mid-session — this endpoint is called
+    // on every app load, so a deactivated account is signed out on its next
+    // page load/refresh without needing separate session-invalidation logic.
     return res.status(401).json({ error: "Not authenticated" });
   }
   res.json({

@@ -14,7 +14,7 @@ const createUserSchema = z.object({
 
 export async function listUsers(_req: Request, res: Response) {
   const result = await pool.query(
-    "SELECT id, username, role, display_name, email, created_at FROM users ORDER BY display_name"
+    "SELECT id, username, role, display_name, email, created_at, is_active FROM users ORDER BY display_name"
   );
   res.json(
     result.rows.map((row) => ({
@@ -24,6 +24,7 @@ export async function listUsers(_req: Request, res: Response) {
       displayName: row.display_name,
       email: row.email,
       createdAt: row.created_at,
+      isActive: row.is_active,
     }))
   );
 }
@@ -56,5 +57,44 @@ export async function createUser(req: Request, res: Response) {
     displayName: user.display_name,
     email: user.email,
     createdAt: user.created_at,
+    isActive: true,
+  });
+}
+
+const setActiveSchema = z.object({
+  isActive: z.boolean(),
+});
+
+export async function setUserActive(req: Request, res: Response) {
+  const id = parseInt(req.params.id, 10);
+  const parsed = setActiveSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  // Deactivating yourself would lock you out with no other admin able to
+  // undo it from inside the app — block it outright rather than allow a
+  // self-inflicted lockout.
+  if (id === req.session.userId && !parsed.data.isActive) {
+    return res.status(400).json({ error: "You cannot deactivate your own account" });
+  }
+
+  const result = await pool.query(
+    "UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id, username, role, display_name, email, created_at, is_active",
+    [parsed.data.isActive, id]
+  );
+  if (result.rows.length === 0) {
+    throw new AppError(404, "User not found");
+  }
+  const user = result.rows[0];
+
+  res.json({
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    displayName: user.display_name,
+    email: user.email,
+    createdAt: user.created_at,
+    isActive: user.is_active,
   });
 }

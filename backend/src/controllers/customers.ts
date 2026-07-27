@@ -27,7 +27,7 @@ export async function listCustomers(req: Request, res: Response) {
         COUNT(t.sr_no) FILTER (WHERE t.status <> 'Closed') AS open_ticket_count,
         MAX(t.ticket_date) AS last_ticket_date
       FROM customers c
-      LEFT JOIN tickets t ON t.customer_id = c.id
+      LEFT JOIN tickets t ON t.customer_id = c.id AND t.deleted_at IS NULL
       ${whereClause}
       GROUP BY c.id
       ORDER BY c.name
@@ -75,7 +75,7 @@ export async function getCustomer(req: Request, res: Response) {
        JOIN users u ON u.id = ta.user_id
        WHERE ta.ticket_sr_no = t.sr_no
      ) assignee_agg ON true
-     WHERE t.customer_id = $1 ORDER BY t.sr_no DESC`,
+     WHERE t.customer_id = $1 AND t.deleted_at IS NULL ORDER BY t.sr_no DESC`,
     [id]
   );
 

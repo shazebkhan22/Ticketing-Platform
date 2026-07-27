@@ -23,13 +23,13 @@ export async function getOptions(_req: Request, res: Response) {
   // from existing tickets as filter suggestions. This grows organically and
   // needs no seed data or admin maintenance.
   const accountManagersResult = await pool.query(
-    "SELECT DISTINCT account_manager FROM tickets ORDER BY account_manager"
+    "SELECT DISTINCT account_manager FROM tickets WHERE deleted_at IS NULL ORDER BY account_manager"
   );
 
   // "Assigned By" is free text (anybody in the company), same pattern as
   // Account Manager — surface previously-used values as suggestions.
   const assignedByResult = await pool.query(
-    "SELECT DISTINCT assigned_by FROM tickets WHERE assigned_by IS NOT NULL ORDER BY assigned_by"
+    "SELECT DISTINCT assigned_by FROM tickets WHERE deleted_at IS NULL AND assigned_by IS NOT NULL ORDER BY assigned_by"
   );
 
   // "Company Name" is free text and the same company can be typed slightly

@@ -7,6 +7,7 @@ export interface AppUser {
   displayName: string;
   email: string | null;
   createdAt: string;
+  isActive: boolean;
 }
 
 export interface CreateUserInput {

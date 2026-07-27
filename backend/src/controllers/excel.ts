@@ -101,7 +101,7 @@ export async function exportTickets(req: Request, res: Response) {
     overdue,
   } = req.query as Record<string, string>;
 
-  const conditions: string[] = [];
+  const conditions: string[] = ["t.deleted_at IS NULL"];
   const params: any[] = [];
 
   if (status) {
@@ -148,7 +148,7 @@ export async function exportTickets(req: Request, res: Response) {
     );
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const whereClause = `WHERE ${conditions.join(" AND ")}`;
   const result = await pool.query(
     `SELECT t.*,
       (SELECT array_agg(

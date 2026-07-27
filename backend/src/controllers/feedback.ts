@@ -6,7 +6,7 @@ export async function getFeedbackByToken(req: Request, res: Response) {
   const { token } = req.params;
   const result = await pool.query(
     `SELECT ticket_no, company_name, customer_feedback_submitted_at
-     FROM tickets WHERE feedback_token = $1`,
+     FROM tickets WHERE feedback_token = $1 AND deleted_at IS NULL`,
     [token]
   );
   if (result.rows.length === 0) {
@@ -37,7 +37,7 @@ export async function submitFeedback(req: Request, res: Response) {
        customer_feedback_rating = $1,
        customer_feedback_comment = $2,
        customer_feedback_submitted_at = now()
-     WHERE feedback_token = $3 AND customer_feedback_submitted_at IS NULL
+     WHERE feedback_token = $3 AND customer_feedback_submitted_at IS NULL AND deleted_at IS NULL
      RETURNING sr_no`,
     [parsed.data.rating, parsed.data.comment || null, token]
   );

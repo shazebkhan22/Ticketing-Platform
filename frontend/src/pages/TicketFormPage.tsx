@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { isAxiosError } from "axios";
 import { toast } from "sonner";
 import { ticketFormSchema, type TicketFormValues } from "@/lib/schemas";
 import { useAuth } from "@/hooks/useAuth";
@@ -152,8 +153,15 @@ export function TicketFormPage() {
         toast.success(`Ticket ${created.ticketNo} created`);
         navigate(`/tickets/${created.srNo}`);
       }
-    } catch {
-      toast.error("Failed to save ticket. Check required fields.");
+    } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 409) {
+        toast.error(
+          err.response.data?.error ||
+            "This ticket was changed by someone else. Please refresh and try again."
+        );
+      } else {
+        toast.error("Failed to save ticket. Check required fields.");
+      }
     }
   }
 

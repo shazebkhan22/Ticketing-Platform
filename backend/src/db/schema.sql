@@ -46,6 +46,18 @@ CREATE TABLE tickets (
   ticket_date DATE NOT NULL,
   mode ticket_mode NOT NULL,
   customer_id INTEGER REFERENCES customers(id),
+  -- company_name/contact_name/contact_no/email_id/address below are a
+  -- DELIBERATE point-in-time snapshot of the customer's details as they
+  -- were when THIS ticket was raised — not a live reference to `customers`.
+  -- A customer's phone/address/contact person can change over time, and a
+  -- historical ticket should keep showing what was true when it was
+  -- created, not silently rewrite itself when the customer's current info
+  -- changes. `customers` (via customer_id) holds the latest known info
+  -- instead — see getOrCreateCustomerId in utils/customers.ts, whose
+  -- "latest ticket wins" upsert only ever updates the customers row, never
+  -- back-fills into past tickets. If you need "what is this customer's
+  -- current contact info," join to `customers`; if you need "what did this
+  -- ticket say at the time," read these columns directly.
   company_name TEXT NOT NULL,
   contact_name TEXT,
   contact_no TEXT,

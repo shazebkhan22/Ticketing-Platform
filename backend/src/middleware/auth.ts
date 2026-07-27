@@ -58,7 +58,10 @@ export async function requireAssigneeOrAdmin(req: Request, res: Response, next: 
   }
 
   const srNo = parseInt(req.params.srNo, 10);
-  const ticketResult = await pool.query("SELECT 1 FROM tickets WHERE sr_no = $1", [srNo]);
+  const ticketResult = await pool.query(
+    "SELECT 1 FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
+    [srNo]
+  );
   if (ticketResult.rows.length === 0) {
     return res.status(404).json({ error: "Ticket not found" });
   }

@@ -40,7 +40,13 @@ const createTicketSchema = z.object({
   internalTag: z.enum(INTERNAL_TAGS).optional(),
 });
 
-const updateTicketSchema = createTicketSchema.partial();
+const updateTicketSchema = createTicketSchema.partial().extend({
+  // Optimistic concurrency: the client must send back the row_version it
+  // last read. A stale value means someone else edited this ticket first —
+  // updateTicket() below turns that mismatch into a 409, instead of the
+  // update silently overwriting their change.
+  rowVersion: z.number().int().positive(),
+});
 
 const statusSchema = z.object({
   status: z.enum(TICKET_STATUSES),
@@ -84,6 +90,7 @@ function rowToTicket(row: any) {
     updatedAt: row.updated_at,
     closedAt: row.closed_at,
     lastRemark: row.last_remark ?? undefined,
+    rowVersion: row.row_version,
   };
 }
 
@@ -115,7 +122,7 @@ export async function listTickets(req: Request, res: Response) {
     pageSize = "50",
   } = req.query as Record<string, string>;
 
-  const conditions: string[] = [];
+  const conditions: string[] = ["t.deleted_at IS NULL"];
   const params: any[] = [];
 
   if (status) {
@@ -162,7 +169,7 @@ export async function listTickets(req: Request, res: Response) {
     );
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
   const limit = Math.min(parseInt(pageSize, 10) || 50, 200);
   const offset = (Math.max(parseInt(page, 10) || 1, 1) - 1) * limit;
@@ -196,8 +203,8 @@ export async function listTickets(req: Request, res: Response) {
 export async function getSummary(req: Request, res: Response) {
   const { assigneeUserId } = req.query as Record<string, string>;
   const whereClause = assigneeUserId
-    ? "WHERE EXISTS (SELECT 1 FROM ticket_assignees ta WHERE ta.ticket_sr_no = t.sr_no AND ta.user_id = $1)"
-    : "";
+    ? "WHERE t.deleted_at IS NULL AND EXISTS (SELECT 1 FROM ticket_assignees ta WHERE ta.ticket_sr_no = t.sr_no AND ta.user_id = $1)"
+    : "WHERE t.deleted_at IS NULL";
   const params = assigneeUserId ? [parseInt(assigneeUserId, 10)] : [];
 
   const result = await pool.query(
@@ -229,7 +236,7 @@ export async function getTicket(req: Request, res: Response) {
     `SELECT t.*, COALESCE(assignee_agg.assignees, '[]'::json) AS assignees
      FROM tickets t
      ${ASSIGNEES_LATERAL_JOIN}
-     WHERE t.sr_no = $1`,
+     WHERE t.sr_no = $1 AND t.deleted_at IS NULL`,
     [srNo]
   );
   if (result.rows.length === 0) {
@@ -373,9 +380,10 @@ export async function updateTicket(req: Request, res: Response) {
   const d = parsed.data;
 
   if (d.ticketDate !== undefined || d.deadlineDate !== undefined) {
-    const existing = await pool.query("SELECT ticket_date, deadline_date FROM tickets WHERE sr_no = $1", [
-      srNo,
-    ]);
+    const existing = await pool.query(
+      "SELECT ticket_date, deadline_date FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
+      [srNo]
+    );
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: "Ticket not found" });
     }
@@ -449,16 +457,35 @@ export async function updateTicket(req: Request, res: Response) {
   let ticket;
   if (setClauses.length > 0) {
     params.push(srNo);
+    const srNoParamIndex = params.length;
+    params.push(d.rowVersion);
+    const rowVersionParamIndex = params.length;
     const result = await pool.query(
-      `UPDATE tickets SET ${setClauses.join(", ")} WHERE sr_no = $${params.length} RETURNING *`,
+      `UPDATE tickets SET ${setClauses.join(", ")}
+       WHERE sr_no = $${srNoParamIndex} AND deleted_at IS NULL AND row_version = $${rowVersionParamIndex}
+       RETURNING *`,
       params
     );
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Ticket not found" });
+      // Distinguish "doesn't exist/already deleted" from "exists but someone
+      // else changed it first" — the frontend needs a different message (and
+      // different recovery action: refresh) for the latter.
+      const stillExists = await pool.query(
+        "SELECT 1 FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
+        [srNo]
+      );
+      if (stillExists.rows.length === 0) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      return res.status(409).json({
+        error: "This ticket was changed by someone else. Please refresh and try again.",
+      });
     }
     ticket = result.rows[0];
   } else {
-    const existing = await pool.query("SELECT * FROM tickets WHERE sr_no = $1", [srNo]);
+    const existing = await pool.query("SELECT * FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL", [
+      srNo,
+    ]);
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: "Ticket not found" });
     }
@@ -499,7 +526,7 @@ export async function updateTicketStatus(req: Request, res: Response) {
 
   const closedAtClause = parsed.data.status === "Closed" ? ", closed_at = now()" : "";
   const result = await pool.query(
-    `UPDATE tickets SET status = $1${closedAtClause} WHERE sr_no = $2 RETURNING *`,
+    `UPDATE tickets SET status = $1${closedAtClause} WHERE sr_no = $2 AND deleted_at IS NULL RETURNING *`,
     [parsed.data.status, srNo]
   );
 
@@ -533,7 +560,7 @@ export async function updateAdminFeedbackResponse(req: Request, res: Response) {
   }
 
   const existing = await pool.query(
-    "SELECT customer_feedback_submitted_at FROM tickets WHERE sr_no = $1",
+    "SELECT customer_feedback_submitted_at FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
     [srNo]
   );
   if (existing.rows.length === 0) {
@@ -547,7 +574,7 @@ export async function updateAdminFeedbackResponse(req: Request, res: Response) {
 
   const result = await pool.query(
     `UPDATE tickets SET admin_feedback_response = $1, admin_feedback_responded_at = now()
-     WHERE sr_no = $2 RETURNING *`,
+     WHERE sr_no = $2 AND deleted_at IS NULL RETURNING *`,
     [parsed.data.response, srNo]
   );
   const ticket = result.rows[0];
@@ -566,9 +593,16 @@ export async function updateAdminFeedbackResponse(req: Request, res: Response) {
 
 export async function deleteTicket(req: Request, res: Response) {
   const srNo = parseInt(req.params.srNo, 10);
-  const result = await pool.query("DELETE FROM tickets WHERE sr_no = $1 RETURNING sr_no, ticket_no", [
-    srNo,
-  ]);
+  // Soft delete: ticket, its remarks, assignees, and activity history all
+  // stay in the DB — this just hides it from every read path (see the
+  // "deleted_at IS NULL" filter on list/get/summary/analytics/export
+  // queries). "AND deleted_at IS NULL" here also makes a second delete
+  // attempt on an already-deleted ticket correctly 404 instead of silently
+  // re-stamping deleted_at.
+  const result = await pool.query(
+    "UPDATE tickets SET deleted_at = now() WHERE sr_no = $1 AND deleted_at IS NULL RETURNING sr_no, ticket_no",
+    [srNo]
+  );
   if (result.rows.length === 0) {
     return res.status(404).json({ error: "Ticket not found" });
   }
@@ -591,7 +625,10 @@ export async function addRemark(req: Request, res: Response) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
-  const ticketExists = await pool.query("SELECT ticket_no FROM tickets WHERE sr_no = $1", [srNo]);
+  const ticketExists = await pool.query(
+    "SELECT ticket_no FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
+    [srNo]
+  );
   if (ticketExists.rows.length === 0) {
     return res.status(404).json({ error: "Ticket not found" });
   }
@@ -623,51 +660,20 @@ export async function addRemark(req: Request, res: Response) {
 }
 
 // Monthly created-vs-closed counts for the last 6 calendar months, plus a
-// breakdown by call type — feeds the Analytics page charts.
+// breakdown by call type — feeds the Analytics page charts. Reads from
+// materialized views (see jobs/analyticsRefresh.ts) refreshed every 15 min,
+// rather than re-aggregating the full tickets table on every page view.
 export async function getAnalytics(_req: Request, res: Response) {
   const monthlyResult = await pool.query(`
-    SELECT
-      TO_CHAR(m.month, 'Mon YYYY') AS month,
-      COALESCE(created.count, 0) AS created,
-      COALESCE(closed.count, 0) AS closed
-    FROM generate_series(
-      date_trunc('month', CURRENT_DATE) - interval '5 months',
-      date_trunc('month', CURRENT_DATE),
-      interval '1 month'
-    ) AS m(month)
-    LEFT JOIN (
-      SELECT date_trunc('month', ticket_date) AS month, COUNT(*) AS count
-      FROM tickets
-      WHERE ticket_date >= date_trunc('month', CURRENT_DATE) - interval '5 months'
-      GROUP BY 1
-    ) created ON created.month = m.month
-    LEFT JOIN (
-      SELECT date_trunc('month', closed_at) AS month, COUNT(*) AS count
-      FROM tickets
-      WHERE closed_at IS NOT NULL AND closed_at >= date_trunc('month', CURRENT_DATE) - interval '5 months'
-      GROUP BY 1
-    ) closed ON closed.month = m.month
-    ORDER BY m.month
+    SELECT month, created, closed FROM mv_analytics_monthly ORDER BY month_start
   `);
 
   const callTypeResult = await pool.query(`
-    SELECT call_type, COUNT(*) AS count
-    FROM tickets
-    GROUP BY call_type
-    ORDER BY count DESC
+    SELECT call_type, count FROM mv_analytics_call_type ORDER BY count DESC
   `);
 
   const employeeResult = await pool.query(`
-    SELECT
-      u.display_name AS employee,
-      COUNT(*) FILTER (WHERE t.status = 'Pending') AS pending,
-      COUNT(*) FILTER (WHERE t.status = 'In Progress') AS in_progress,
-      COUNT(*) FILTER (WHERE t.status = 'Closed') AS closed
-    FROM users u
-    JOIN ticket_assignees ta ON ta.user_id = u.id
-    JOIN tickets t ON t.sr_no = ta.ticket_sr_no
-    GROUP BY u.id, u.display_name
-    ORDER BY u.display_name
+    SELECT employee, pending, in_progress, closed FROM mv_analytics_employee ORDER BY employee
   `);
 
   // These four are point-in-time composition breakdowns (not trended like
@@ -675,19 +681,19 @@ export async function getAnalytics(_req: Request, res: Response) {
   // so the pie/donut legend order matches each enum's declared order
   // (e.g. P1..P4, Pending/In Progress/Closed) instead of shuffling by count.
   const priorityResult = await pool.query(`
-    SELECT priority, COUNT(*) AS count FROM tickets GROUP BY priority ORDER BY priority
+    SELECT priority, count FROM mv_analytics_priority ORDER BY priority
   `);
 
   const statusResult = await pool.query(`
-    SELECT status, COUNT(*) AS count FROM tickets GROUP BY status ORDER BY status
+    SELECT status, count FROM mv_analytics_status ORDER BY status
   `);
 
   const modeResult = await pool.query(`
-    SELECT mode, COUNT(*) AS count FROM tickets GROUP BY mode ORDER BY mode
+    SELECT mode, count FROM mv_analytics_mode ORDER BY mode
   `);
 
   const internalTagResult = await pool.query(`
-    SELECT internal_tag, COUNT(*) AS count FROM tickets GROUP BY internal_tag ORDER BY internal_tag
+    SELECT internal_tag, count FROM mv_analytics_internal_tag ORDER BY internal_tag
   `);
 
   res.json({

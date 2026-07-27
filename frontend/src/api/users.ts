@@ -10,3 +10,8 @@ export async function createUser(input: CreateUserInput): Promise<AppUser> {
   const { data } = await apiClient.post<AppUser>("/users", input);
   return data;
 }
+
+export async function setUserActive(id: number, isActive: boolean): Promise<AppUser> {
+  const { data } = await apiClient.patch<AppUser>(`/users/${id}/active`, { isActive });
+  return data;
+}
