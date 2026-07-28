@@ -7,6 +7,7 @@ import { useAddProjectRemark, useProjectDetail, useUpdateProjectStatus } from "@
 import type { TicketStatus } from "@/types/ticket";
 import { STATUS_FLOW } from "@/constants/ticket";
 import { ProjectStatusBadge } from "@/components/ProjectStatusBadge";
+import { InstallationReportPrint } from "@/components/InstallationReportPrint";
 import { formatDate, formatDateTime, formatDateTimeWithSeconds } from "@/lib/ticket-utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -69,8 +70,36 @@ export function ProjectDetailPage() {
     toast.success(`Status changed to ${status}`);
   }
 
+  const modelText = project.components.map((c) => `${c.model} (${c.quantity} Qty)`).join("\n");
+  const serialText = project.components
+    .map((c) => `${c.model} (${c.quantity} Qty): - ${c.serialNumbers || "-"}`)
+    .join("\n\n");
+  const engineerName = project.assignees.map((a) => a.displayName).join(", ");
+
   return (
     <div>
+      <div className="hidden print:block">
+        <InstallationReportPrint
+          title="INSTALLATION REPORT"
+          companyName={project.companyName}
+          address={project.address}
+          userName={project.contactName}
+          designation={project.designation}
+          department={project.department}
+          email={project.emailId}
+          mobileNo={project.contactNo}
+          poNumber={project.poNumber}
+          contractNo={project.contractNumber}
+          modelText={modelText}
+          serialText={serialText}
+          dateLabel="Installation Date"
+          date={formatDate(project.startDate)}
+          engineerName={engineerName}
+          status={project.status}
+        />
+      </div>
+
+      <div className="print:hidden">
       <div className="no-print mb-6 flex items-center justify-between">
         <div>
           <Button onClick={() => navigate("/projects")}>← Back to projects</Button>
@@ -79,9 +108,11 @@ export function ProjectDetailPage() {
           </h2>
         </div>
         <div className="flex gap-2">
+          {project.status === "Closed" && (
           <Button variant="outline" onClick={() => window.print()}>
             Print
           </Button>
+          )}
           {canEdit && (
             <Button onClick={() => navigate(`/projects/${project.srNo}/edit`)}>Edit</Button>
           )}
@@ -237,6 +268,7 @@ export function ProjectDetailPage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

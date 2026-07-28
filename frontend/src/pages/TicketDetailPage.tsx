@@ -17,6 +17,7 @@ import {
 import type { TicketStatus } from "@/types/ticket";
 import { STATUS_FLOW } from "@/constants/ticket";
 import { StatusBadge } from "@/components/StatusBadge";
+import { InstallationReportPrint } from "@/components/InstallationReportPrint";
 import { formatDate, formatDateTime, formatDateTimeWithSeconds } from "@/lib/ticket-utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -92,8 +93,28 @@ export function TicketDetailPage() {
     toast.success("Response saved");
   }
 
+  const engineerName = ticket.assignees.map((a) => a.displayName).join(", ");
+
   return (
     <div>
+      <div className="hidden print:block">
+        <InstallationReportPrint
+          title="CALL REPORT"
+          companyName={ticket.companyName}
+          address={ticket.address}
+          userName={ticket.contactName}
+          email={ticket.emailId}
+          mobileNo={ticket.contactNo}
+          modelText={ticket.model ?? ""}
+          serialText={ticket.serialNumber ?? ""}
+          dateLabel="Date"
+          date={formatDate(ticket.ticketDate)}
+          engineerName={engineerName}
+          status={ticket.status}
+        />
+      </div>
+
+      <div className="print:hidden">
       <div className="no-print mb-6 flex items-center justify-between">
         <div>
           <Button
@@ -106,9 +127,11 @@ export function TicketDetailPage() {
           </h2>
         </div>
         <div className="flex gap-2">
+          {ticket.status === "Closed" && (
           <Button variant="outline" onClick={() => window.print()}>
             Print
           </Button>
+          )}
           {canEdit && (
             <Button onClick={() => navigate(`/tickets/${ticket.srNo}/edit`)}>Edit</Button>
           )}
@@ -298,6 +321,7 @@ export function TicketDetailPage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
