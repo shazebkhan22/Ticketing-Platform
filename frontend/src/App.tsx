@@ -19,6 +19,15 @@ const TicketDetailPage = lazy(() =>
 const TicketFormPage = lazy(() =>
   import("@/pages/TicketFormPage").then((m) => ({ default: m.TicketFormPage }))
 );
+const ProjectsDashboardPage = lazy(() =>
+  import("@/pages/ProjectsDashboardPage").then((m) => ({ default: m.ProjectsDashboardPage }))
+);
+const ProjectDetailPage = lazy(() =>
+  import("@/pages/ProjectDetailPage").then((m) => ({ default: m.ProjectDetailPage }))
+);
+const ProjectFormPage = lazy(() =>
+  import("@/pages/ProjectFormPage").then((m) => ({ default: m.ProjectFormPage }))
+);
 const ProfilePage = lazy(() =>
   import("@/pages/ProfilePage").then((m) => ({ default: m.ProfilePage }))
 );
@@ -91,9 +100,13 @@ function App() {
                   <Route path="/tickets/new" element={<TicketFormPage />} />
                   <Route path="/tickets/:srNo" element={<TicketDetailPage />} />
                   <Route path="/tickets/:srNo/edit" element={<TicketFormPage />} />
+                  <Route path="/projects" element={<ProjectsDashboardPage />} />
+                  <Route path="/projects/:srNo" element={<ProjectDetailPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/password" element={<PasswordPage />} />
                   <Route element={<AdminRoute />}>
+                    <Route path="/projects/new" element={<ProjectFormPage />} />
+                    <Route path="/projects/:srNo/edit" element={<ProjectFormPage />} />
                     <Route path="/activity" element={<ActivityLogPage />} />
                     <Route path="/customers" element={<CustomersPage />} />
                     <Route path="/customers/:id" element={<CustomerDetailPage />} />

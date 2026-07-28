@@ -7,6 +7,7 @@ import {
   INTERNAL_TAGS,
   TICKET_PRIORITIES,
 } from "../types/ticket";
+import { PROJECT_TIME_UNITS } from "../types/project";
 
 export async function getOptions(_req: Request, res: Response) {
   // "Assigned To" must be one of the platform employees (the engineers who
@@ -50,6 +51,7 @@ export async function getOptions(_req: Request, res: Response) {
     statuses: TICKET_STATUSES,
     internalTags: INTERNAL_TAGS,
     priorities: TICKET_PRIORITIES,
+    projectTimeUnits: PROJECT_TIME_UNITS,
     accountManagers: accountManagersResult.rows.map((r) => r.account_manager),
     assignedBys: assignedByResult.rows.map((r) => r.assigned_by),
     companyNames: customersResult.rows.map((r) => r.name),

@@ -48,6 +48,37 @@ export const ticketFormSchema = z
   });
 export type TicketFormValues = z.infer<typeof ticketFormSchema>;
 
+export const projectComponentSchema = z.object({
+  model: z.string().min(1, "Required"),
+  quantity: z.number().int().positive("Required"),
+  serialNumbers: z.string().optional(),
+});
+export type ProjectComponentValues = z.infer<typeof projectComponentSchema>;
+
+export const projectFormSchema = z.object({
+  startDate: z.string().min(1, "Required"),
+  timeValue: z.number().int().positive("Required"),
+  timeUnit: z.string().min(1, "Required"),
+  companyName: z.string().min(1, "Required"),
+  contactName: z.string().min(1, "Required"),
+  contactNo: z.string().min(1, "Required"),
+  emailId: z.string().min(1, "Required").email({ message: "Invalid email" }),
+  designation: z.string().optional(),
+  department: z.string().optional(),
+  address: z.string().min(1, "Required"),
+  components: z.array(projectComponentSchema).optional(),
+  poNumber: z.string().optional(),
+  contractNumber: z.string().optional(),
+  problem: z.string().min(1, "Required"),
+  accountManager: z.string().min(1, "Required"),
+  assignedBy: z.string().min(1, "Required"),
+  assigneeUserIds: z.array(z.number().int().positive()).min(1, "Select at least one employee"),
+  priority: z.string().min(1, "Required"),
+});
+export type ProjectFormValues = z.infer<typeof projectFormSchema>;
+
+export const projectRemarkSchema = z.string().trim().min(1, "Remark cannot be empty");
+
 export const profileDetailsSchema = z.object({
   displayName: z.string().min(1, "Required").max(100),
   email: z.string().email({ message: "Invalid email" }).optional().or(z.literal("")),

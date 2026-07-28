@@ -1,3 +1,5 @@
+import type { ProjectTimeUnit } from "@/types/project";
+
 export type TicketMode = "Whatsapp" | "Call" | "Mail" | "Verbally";
 export type CallType =
   | "Warranty"
@@ -138,6 +140,7 @@ export interface MetaOptions {
   statuses: TicketStatus[];
   internalTags: InternalTag[];
   priorities: TicketPriority[];
+  projectTimeUnits: ProjectTimeUnit[];
   accountManagers: string[];
   assignedBys: string[];
   companyNames: string[];

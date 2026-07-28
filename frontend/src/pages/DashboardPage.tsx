@@ -209,6 +209,9 @@ export function DashboardPage() {
           <Button variant="default" onClick={() => navigate("/tickets/new")}>
             + New Ticket
           </Button>
+           <Button variant="default" onClick={() => navigate("/projects/new")}>
+            + New Project
+          </Button>
         </div>
       </div>
 

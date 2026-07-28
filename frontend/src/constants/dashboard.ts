@@ -1,4 +1,5 @@
 import type { Summary, TicketFilters } from "@/types/ticket";
+import type { ProjectFilters } from "@/types/project";
 
 export const SUMMARY_CARDS: { key: keyof Summary; label: string; color: string }[] = [
   { key: "total", label: "Total Tickets", color: "bg-indigo-100 text-indigo-800" },
@@ -11,3 +12,5 @@ export const SUMMARY_CARDS: { key: keyof Summary; label: string; color: string }
 export const ALL_FILTER_VALUE = "__all__";
 
 export const DEFAULT_TICKET_FILTERS: TicketFilters = { page: 1, pageSize: 7 };
+
+export const DEFAULT_PROJECT_FILTERS: ProjectFilters = { page: 1, pageSize: 7 };

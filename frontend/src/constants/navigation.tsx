@@ -7,6 +7,7 @@ import {
   BuildingIcon,
   SettingsIcon,
   UsersIcon,
+  FolderKanbanIcon,
 } from "lucide-react";
 
 export const NAV_MAIN = [
@@ -14,6 +15,7 @@ export const NAV_MAIN = [
   { title: "Dashboard", url: "/", icon: <LayoutDashboardIcon /> },
   { title: "My Tickets", url: "/?mine=true", icon: <ListChecksIcon /> },
   { title: "Overdue", url: "/?overdue=true", icon: <AlertTriangleIcon /> },
+  { title: "Projects", url: "/projects", icon: <FolderKanbanIcon /> },
 ];
 
 // Shown only to admins — see AppSidebar, which filters by user.role.
