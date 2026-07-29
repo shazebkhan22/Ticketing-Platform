@@ -7,7 +7,7 @@ import { useAddProjectRemark, useProjectDetail, useUpdateProjectStatus } from "@
 import type { TicketStatus } from "@/types/ticket";
 import { STATUS_FLOW } from "@/constants/ticket";
 import { ProjectStatusBadge } from "@/components/ProjectStatusBadge";
-import { InstallationReportPrint } from "@/components/InstallationReportPrint";
+import { InstallationReport } from "@/components/InstallationReport";
 import { formatDate, formatDateTime, formatDateTimeWithSeconds } from "@/lib/ticket-utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -79,7 +79,7 @@ export function ProjectDetailPage() {
   return (
     <div>
       <div className="hidden print:block">
-        <InstallationReportPrint
+        <InstallationReport
           title="INSTALLATION REPORT"
           companyName={project.companyName}
           address={project.address}

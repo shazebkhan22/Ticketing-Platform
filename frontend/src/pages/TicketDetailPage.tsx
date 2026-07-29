@@ -17,7 +17,7 @@ import {
 import type { TicketStatus } from "@/types/ticket";
 import { STATUS_FLOW } from "@/constants/ticket";
 import { StatusBadge } from "@/components/StatusBadge";
-import { InstallationReportPrint } from "@/components/InstallationReportPrint";
+import { InstallationReport } from "@/components/InstallationReport";
 import { formatDate, formatDateTime, formatDateTimeWithSeconds } from "@/lib/ticket-utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -98,7 +98,7 @@ export function TicketDetailPage() {
   return (
     <div>
       <div className="hidden print:block">
-        <InstallationReportPrint
+        <InstallationReport
           title="CALL REPORT"
           companyName={ticket.companyName}
           address={ticket.address}

@@ -1,5 +1,5 @@
 
-export interface InstallationReportPrintProps {
+export interface InstallationReportProps {
   title: string;
   companyName: string;
   address?: string | null;
@@ -39,7 +39,7 @@ function Cell({
   );
 }
 
-export function InstallationReportPrint({
+export function InstallationReport({
   title,
   companyName,
   address,
@@ -56,7 +56,7 @@ export function InstallationReportPrint({
   date,
   engineerName,
   status,
-}: InstallationReportPrintProps) {
+}: InstallationReportProps) {
   return (
     <div className="mx-auto max-w-3xl border border-black text-black">
       <div className="border-b border-black px-3 py-3">
@@ -115,7 +115,8 @@ export function InstallationReportPrint({
       <Row>
         <div className="grid grid-cols-2">
           <Cell label="Time" value="" className="border-r border-black" />
-          <Cell label="Status" value={status} />
+          <Cell label="Status" value={status=="Closed"?"Completed":"Open"
+          } />
         </div>
       </Row>
 
