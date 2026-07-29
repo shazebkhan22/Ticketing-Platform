@@ -14,6 +14,7 @@ import {
 } from "@/hooks/useProjects";
 import type { CustomerDirectoryEntry } from "@/types/ticket";
 import type { ProjectDetail, ProjectFormInput } from "@/types/project";
+import { AccountManagerSelect } from "@/components/AccountManagerSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -476,7 +477,7 @@ export function ProjectFormPage() {
               name="problem"
               render={({ field }) => (
                 <FormItem className="md:col-span-2">
-                  <FormLabel>Problem / Scope<span className="text-red-500">*</span></FormLabel>
+                  <FormLabel>Scope of Work<span className="text-red-500">*</span></FormLabel>
                   <FormControl>
                     <Textarea placeholder="Describe the project scope" rows={3} capitalize {...field} />
                   </FormControl>
@@ -491,23 +492,13 @@ export function ProjectFormPage() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Account Manager<span className="text-red-500">*</span></FormLabel>
-                  <Select
-                    value={field.value ? String(field.value) : undefined}
-                    onValueChange={(v) => field.onChange(Number(v))}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select an account manager" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {options.accountManagerDirectory.map((am) => (
-                        <SelectItem key={am.id} value={String(am.id)}>
-                          {am.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormControl>
+                    <AccountManagerSelect
+                      value={field.value || undefined}
+                      onChange={field.onChange}
+                      options={options.accountManagerDirectory}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

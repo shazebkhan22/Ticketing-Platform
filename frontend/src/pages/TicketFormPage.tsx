@@ -13,6 +13,7 @@ import {
   useUpdateTicket,
 } from "@/hooks/useTickets";
 import type { CustomerDirectoryEntry, TicketDetail, TicketFormInput } from "@/types/ticket";
+import { AccountManagerSelect } from "@/components/AccountManagerSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -51,7 +52,7 @@ const EMPTY_FORM: TicketFormValues = {
   model: "",
   serialNumber: "",
   problem: "",
-  accountManager: "",
+  accountManagerId: 0,
   assignedBy: "",
   callType: "Call",
   assigneeUserIds: [],
@@ -72,7 +73,7 @@ function ticketToFormValues(ticket: TicketDetail["ticket"]): TicketFormValues {
     model: ticket.model ?? "",
     serialNumber: ticket.serialNumber ?? "",
     problem: ticket.problem,
-    accountManager: ticket.accountManager,
+    accountManagerId: ticket.accountManagerId ?? 0,
     assignedBy: ticket.assignedBy ?? "",
     callType: ticket.callType,
     assigneeUserIds: ticket.assignees.map((a) => a.id),
@@ -421,21 +422,15 @@ export function TicketFormPage() {
 
             <FormField
               control={form.control}
-              name="accountManager"
+              name="accountManagerId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Account Manager *</FormLabel>
                   <FormControl>
-                    <Combobox
-                      value={field.value}
+                    <AccountManagerSelect
+                      value={field.value || undefined}
                       onChange={field.onChange}
-                      options={options.accountManagers.map((a) => ({
-                        value: a,
-                        label: a,
-                      }))}
-                      placeholder="Person in the office who handles the account"
-                      searchPlaceholder="Search or type a name..."
-                      allowCustomValue
+                      options={options.accountManagerDirectory}
                     />
                   </FormControl>
                   <FormMessage />

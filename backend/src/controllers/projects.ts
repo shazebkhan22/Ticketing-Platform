@@ -5,6 +5,7 @@ import { generateProjectNumber } from "../utils/projectNumber";
 import { computeDeadline } from "../utils/projectDeadline";
 import { logActivity } from "../utils/activityLog";
 import { getOrCreateCustomerId } from "../utils/customers";
+import { resolveAccountManagerName } from "../utils/accountManagers";
 import { TICKET_STATUSES, TICKET_PRIORITIES } from "../types/ticket";
 import { PROJECT_TIME_UNITS } from "../types/project";
 
@@ -128,14 +129,6 @@ async function insertAssignees(projectSrNo: number, userIds: number[]) {
     projectSrNo,
     ...userIds,
   ]);
-}
-
-// account_manager (text) is kept alongside account_manager_id so existing
-// filters/exports/display keep working unchanged — only the id is
-// authoritative for resolving an email (see jobs/dailyDigest.ts).
-async function resolveAccountManagerName(accountManagerId: number): Promise<string | null> {
-  const result = await pool.query("SELECT name FROM account_managers WHERE id = $1", [accountManagerId]);
-  return result.rows[0]?.name ?? null;
 }
 
 export async function listProjects(req: Request, res: Response) {

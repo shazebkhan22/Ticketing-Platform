@@ -3,8 +3,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { useUsers, useCreateUser, useSetUserActive } from "@/hooks/useUsers";
+import { useAccountManagers, useCreateAccountManager, useUpdateAccountManager } from "@/hooks/useAccountManagers";
 import { useAuth } from "@/hooks/useAuth";
-import { createUserSchema, type CreateUserValues } from "@/lib/schemas";
+import type { AccountManager } from "@/types/user";
+import {
+  createUserSchema,
+  type CreateUserValues,
+  createAccountManagerSchema,
+  type CreateAccountManagerValues,
+} from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,14 +38,19 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { PlusCircleIcon } from "lucide-react";
+import { PlusCircleIcon, PencilIcon } from "lucide-react";
 
 export function UsersPage() {
   const { user: currentUser } = useAuth();
   const { data: users, isLoading } = useUsers();
+  const { data: accountManagers, isLoading: accountManagersLoading } = useAccountManagers();
   const createMutation = useCreateUser();
+  const createAccountManagerMutation = useCreateAccountManager();
+  const updateAccountManagerMutation = useUpdateAccountManager();
   const setActiveMutation = useSetUserActive();
   const [open, setOpen] = useState(false);
+  const [entryType, setEntryType] = useState<"employee" | "accountManager">("employee");
+  const [editingAccountManager, setEditingAccountManager] = useState<AccountManager | null>(null);
 
   async function handleToggleActive(id: number, isActive: boolean) {
     try {
@@ -63,6 +75,22 @@ export function UsersPage() {
     },
   });
 
+  const accountManagerForm = useForm<CreateAccountManagerValues>({
+    resolver: zodResolver(createAccountManagerSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+    },
+  });
+
+  const editAccountManagerForm = useForm<CreateAccountManagerValues>({
+    resolver: zodResolver(createAccountManagerSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+    },
+  });
+
   async function onSubmit(values: CreateUserValues) {
     try {
       await createMutation.mutateAsync(values);
@@ -77,26 +105,118 @@ export function UsersPage() {
     }
   }
 
+  async function onSubmitAccountManager(values: CreateAccountManagerValues) {
+    try {
+      await createAccountManagerMutation.mutateAsync(values);
+      toast.success("Account manager added");
+      accountManagerForm.reset();
+      setOpen(false);
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        "Failed to add account manager";
+      toast.error(typeof message === "string" ? message : "Failed to add account manager");
+    }
+  }
+
+  function openEditAccountManager(am: AccountManager) {
+    setEditingAccountManager(am);
+    editAccountManagerForm.reset({ name: am.name, email: am.email });
+  }
+
+  async function onSubmitEditAccountManager(values: CreateAccountManagerValues) {
+    if (!editingAccountManager) return;
+    try {
+      await updateAccountManagerMutation.mutateAsync({ id: editingAccountManager.id, input: values });
+      toast.success("Account manager updated");
+      setEditingAccountManager(null);
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        "Failed to update account manager";
+      toast.error(typeof message === "string" ? message : "Failed to update account manager");
+    }
+  }
+
   return (
     <div className=" space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-neutral-800">Employees</h2>
           <p className="text-sm text-neutral-500 max-w-xl">
-            Manage engineer and admin accounts.
+            Manage engineer/admin accounts and account managers.
           </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(o) => {
+            setOpen(o);
+            if (!o) {
+              form.reset();
+              accountManagerForm.reset();
+              setEntryType("employee");
+            }
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <PlusCircleIcon />
-              Add Engineer
+              Add
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Engineer / Employee</DialogTitle>
+              <DialogTitle>Add Employee or Account Manager</DialogTitle>
             </DialogHeader>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-neutral-500">Type</label>
+              <Select value={entryType} onValueChange={(v) => setEntryType(v as typeof entryType)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="accountManager">Account Manager</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {entryType === "accountManager" ? (
+              <Form {...accountManagerForm}>
+                <form onSubmit={accountManagerForm.handleSubmit(onSubmitAccountManager)} className="space-y-4">
+                  <FormField
+                    control={accountManagerForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={accountManagerForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="name@cygnussolutions.co.in" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" disabled={createAccountManagerMutation.isPending} className="w-full">
+                    {createAccountManagerMutation.isPending ? "Adding..." : "Add Account Manager"}
+                  </Button>
+                </form>
+              </Form>
+            ) : (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -182,11 +302,13 @@ export function UsersPage() {
                 </Button>
               </form>
             </Form>
+            )}
           </DialogContent>
         </Dialog>
       </div>
 
       <div className="rounded-lg border border-neutral-200 bg-white p-6">
+        <h3 className="mb-3 text-sm font-bold text-cygnus-700">Employees</h3>
         {isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-9 w-full" />
@@ -235,6 +357,96 @@ export function UsersPage() {
           </table>
         )}
       </div>
+
+      <div className="rounded-lg border border-neutral-200 bg-white p-6">
+        <h3 className="mb-3 text-sm font-bold text-cygnus-700">Account Managers</h3>
+        {accountManagersLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200 text-left text-neutral-500">
+                <th className="pb-2 font-medium">Name</th>
+                <th className="pb-2 font-medium">Email</th>
+                <th className="pb-2 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {accountManagers?.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="py-4 text-center text-neutral-400">
+                    No account managers yet.
+                  </td>
+                </tr>
+              )}
+              {accountManagers?.map((am) => (
+                <tr key={am.id} className="border-b border-neutral-100 last:border-0">
+                  <td className="py-2 text-neutral-800">{am.name}</td>
+                  <td className="py-2 text-neutral-600">{am.email}</td>
+                  <td className="py-2 text-right">
+                    <Button size="sm" variant="outline" onClick={() => openEditAccountManager(am)}>
+                      <PencilIcon />
+                      Edit
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <Dialog
+        open={editingAccountManager !== null}
+        onOpenChange={(o) => {
+          if (!o) setEditingAccountManager(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Account Manager</DialogTitle>
+          </DialogHeader>
+          <Form {...editAccountManagerForm}>
+            <form
+              onSubmit={editAccountManagerForm.handleSubmit(onSubmitEditAccountManager)}
+              className="space-y-4"
+            >
+              <FormField
+                control={editAccountManagerForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editAccountManagerForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="name@cygnussolutions.co.in" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" disabled={updateAccountManagerMutation.isPending} className="w-full">
+                {updateAccountManagerMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

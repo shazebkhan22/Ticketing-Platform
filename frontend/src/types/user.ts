@@ -17,3 +17,16 @@ export interface CreateUserInput {
   displayName: string;
   email?: string;
 }
+
+export interface AccountManager {
+  id: number;
+  name: string;
+  email: string;
+  userId: number | null;
+  createdAt: string;
+}
+
+export interface CreateAccountManagerInput {
+  name: string;
+  email: string;
+}

@@ -4,6 +4,7 @@ import { pool } from "../db/pool";
 import { generateTicketNumber } from "../utils/ticketNumber";
 import { logActivity } from "../utils/activityLog";
 import { getOrCreateCustomerId } from "../utils/customers";
+import { resolveAccountManagerName } from "../utils/accountManagers";
 import {
   TICKET_MODES,
   CALL_TYPES,
@@ -23,9 +24,11 @@ const createTicketSchema = z.object({
   model: z.string().optional(),
   serialNumber: z.string().optional(),
   problem: z.string().min(1),
-  // Account Manager = whoever in the office reported/raised this issue — free
-  // text, NOT the logged-in user. Can be anybody, not just the 5 platform users.
-  accountManager: z.string().min(1),
+  // Account Manager = whoever in the office reported/raised this issue.
+  // Used to be free text; now picked from the shared account_managers
+  // directory (see migrations/1785160000000_add-account-managers.sql) so
+  // every ticket resolves to a real email, same as projects.
+  accountManagerId: z.coerce.number().int().positive(),
   // Assigned By = whoever in the company assigned/raised this ticket — free
   // text just like accountManager, can be anybody, not limited to platform users.
   assignedBy: z.string().min(1),
@@ -74,6 +77,7 @@ function rowToTicket(row: any) {
     problem: row.problem,
     ownerUserId: row.owner_user_id,
     accountManager: row.account_manager,
+    accountManagerId: row.account_manager_id,
     assignedBy: row.assigned_by,
     callType: row.call_type,
     assignees: row.assignees ?? [],
@@ -304,6 +308,11 @@ export async function createTicket(req: Request, res: Response) {
     return res.status(assigneeCheck.status).json({ error: assigneeCheck.error });
   }
 
+  const accountManagerName = await resolveAccountManagerName(d.accountManagerId);
+  if (accountManagerName === null) {
+    return res.status(400).json({ error: "Invalid account manager" });
+  }
+
   const ticketDate = new Date(d.ticketDate);
   const ticketNo = await generateTicketNumber(ticketDate);
 
@@ -322,9 +331,9 @@ export async function createTicket(req: Request, res: Response) {
   const result = await pool.query(
     `INSERT INTO tickets (
       ticket_no, ticket_date, mode, customer_id, company_name, contact_name, contact_no, email_id, address,
-      model, serial_number, problem, owner_user_id, account_manager, assigned_by, call_type,
+      model, serial_number, problem, owner_user_id, account_manager, account_manager_id, assigned_by, call_type,
       priority, deadline_date, internal_tag
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
     RETURNING *`,
     [
       ticketNo,
@@ -340,7 +349,8 @@ export async function createTicket(req: Request, res: Response) {
       d.serialNumber ?? null,
       d.problem,
       ownerUserId,
-      d.accountManager,
+      accountManagerName,
+      d.accountManagerId,
       d.assignedBy,
       d.callType,
       d.priority ?? "P3",
@@ -405,7 +415,6 @@ export async function updateTicket(req: Request, res: Response) {
     model: "model",
     serialNumber: "serial_number",
     problem: "problem",
-    accountManager: "account_manager",
     assignedBy: "assigned_by",
     callType: "call_type",
     priority: "priority",
@@ -424,6 +433,19 @@ export async function updateTicket(req: Request, res: Response) {
       params.push(value);
       setClauses.push(`${column} = $${params.length}`);
     }
+  }
+
+  // account_manager (text) is always kept in sync with account_manager_id —
+  // never set independently, unlike the plain scalar fields above.
+  if (d.accountManagerId !== undefined) {
+    const accountManagerName = await resolveAccountManagerName(d.accountManagerId);
+    if (accountManagerName === null) {
+      return res.status(400).json({ error: "Invalid account manager" });
+    }
+    params.push(accountManagerName);
+    setClauses.push(`account_manager = $${params.length}`);
+    params.push(d.accountManagerId);
+    setClauses.push(`account_manager_id = $${params.length}`);
   }
 
   // Reassigning a ticket replaces the full ticket_assignees set — never

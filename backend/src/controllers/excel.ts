@@ -389,6 +389,16 @@ export async function importTickets(req: Request, res: Response) {
     employeesResult.rows.map((r) => [r.display_name.toLowerCase(), r.id as number])
   );
 
+  // Best-effort match against the account_managers directory (see
+  // controllers/projectExcel.ts importProjects for the same pattern) — lets
+  // a bulk-imported ticket still resolve to a real email where the typed
+  // name happens to match exactly; no match just leaves account_manager_id
+  // NULL, same as tickets that predate the directory.
+  const accountManagersResult = await pool.query("SELECT id, name FROM account_managers");
+  const accountManagerIdByName = new Map(
+    accountManagersResult.rows.map((r) => [r.name.toLowerCase(), r.id as number])
+  );
+
   const ownerUserId = req.session.userId;
   const results: ImportRowResult[] = [];
 
@@ -464,12 +474,13 @@ export async function importTickets(req: Request, res: Response) {
         emailId: d.emailId,
         address: d.address,
       });
+      const accountManagerId = accountManagerIdByName.get(d.accountManager.toLowerCase()) ?? null;
       const inserted = await pool.query(
         `INSERT INTO tickets (
           ticket_no, ticket_date, mode, customer_id, company_name, contact_name, contact_no, email_id, address,
-          model, serial_number, problem, owner_user_id, account_manager, assigned_by, call_type,
+          model, serial_number, problem, owner_user_id, account_manager, account_manager_id, assigned_by, call_type,
           priority, deadline_date, status, internal_tag
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
         RETURNING sr_no`,
         [
           ticketNo,
@@ -486,6 +497,7 @@ export async function importTickets(req: Request, res: Response) {
           d.problem,
           ownerUserId,
           d.accountManager,
+          accountManagerId,
           d.assignedBy,
           d.callType,
           d.priority ?? "P3",

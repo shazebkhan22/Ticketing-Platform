@@ -19,6 +19,7 @@ import { inventoryRouter } from "./routes/inventory";
 import { settingsRouter } from "./routes/settings";
 import { feedbackRouter } from "./routes/feedback";
 import { usersRouter } from "./routes/users";
+import { accountManagersRouter } from "./routes/accountManagers";
 
 export const app = express();
 
@@ -77,6 +78,7 @@ app.use("/api/customers", customersRouter);
 app.use("/api/inventory", inventoryRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/account-managers", accountManagersRouter);
 app.use("/api/public/feedback", feedbackRouter);
 
 app.use((_req: express.Request, res: express.Response) => {

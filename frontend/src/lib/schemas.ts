@@ -34,7 +34,7 @@ export const ticketFormSchema = z
     model: z.string().optional(),
     serialNumber: z.string().optional(),
     problem: z.string().min(1, "Required"),
-    accountManager: z.string().min(1, "Required"),
+    accountManagerId: z.number().int().positive("Required"),
     assignedBy: z.string().min(1, "Required"),
     callType: z.string().min(1, "Required"),
     assigneeUserIds: z.array(z.number().int().positive()).min(1, "Select at least one employee"),
@@ -131,3 +131,9 @@ export const createUserSchema = z.object({
   email: z.string().email({ message: "Invalid email" }).optional().or(z.literal("")),
 });
 export type CreateUserValues = z.infer<typeof createUserSchema>;
+
+export const createAccountManagerSchema = z.object({
+  name: z.string().min(1, "Required").max(100),
+  email: z.string().min(1, "Required").email({ message: "Invalid email" }),
+});
+export type CreateAccountManagerValues = z.infer<typeof createAccountManagerSchema>;

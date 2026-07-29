@@ -32,6 +32,7 @@ export interface Ticket {
   problem: string;
   ownerUserId: number;
   accountManager: string;
+  accountManagerId: number | null;
   assignedBy: string | null;
   callType: CallType;
   assignees: Employee[];
@@ -200,7 +201,7 @@ export interface TicketFormInput {
   model?: string;
   serialNumber?: string;
   problem: string;
-  accountManager: string;
+  accountManagerId: number;
   assignedBy: string;
   callType: CallType;
   assigneeUserIds: number[];
