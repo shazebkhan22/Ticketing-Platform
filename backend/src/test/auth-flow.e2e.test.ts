@@ -30,7 +30,7 @@ describe("login -> create ticket -> logout", () => {
       emailId: "jane@acme.test",
       address: "123 Main St",
       problem: "Printer not turning on",
-      accountManager: "Alice",
+      accountManagerId: 1,
       assignedBy: "Bob",
       callType: "Call",
       assigneeUserIds: [adminId],

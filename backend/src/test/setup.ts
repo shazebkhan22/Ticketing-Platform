@@ -53,6 +53,13 @@ beforeAll(async () => {
     [TEST_ADMIN.username, passwordHash]
   );
 
+  // Tickets/projects reference account_managers by id (see migrations/
+  // 1785160000000_add-account-managers.sql) — seed one fixed row so e2e
+  // tests have a valid id to send, same rationale as TEST_ADMIN above.
+  await client.query(
+    `INSERT INTO account_managers (id, name, email) VALUES (1, 'Test Account Manager', 'am@example.com')`
+  );
+
   await client.end();
 }, 30000);
 

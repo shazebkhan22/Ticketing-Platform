@@ -166,20 +166,29 @@ export function UsersPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Employee or Account Manager</DialogTitle>
+              <DialogTitle>Add Employee/Account Manager</DialogTitle>
             </DialogHeader>
 
             <div>
               <label className="mb-1 block text-xs font-semibold text-neutral-500">Type</label>
-              <Select value={entryType} onValueChange={(v) => setEntryType(v as typeof entryType)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="employee">Employee</SelectItem>
-                  <SelectItem value="accountManager">Account Manager</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={entryType === "employee" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setEntryType("employee")}
+                >
+                  Employee
+                </Button>
+                <Button
+                  type="button"
+                  variant={entryType === "accountManager" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setEntryType("accountManager")}
+                >
+                  Account Manager
+                </Button>
+              </div>
             </div>
 
             {entryType === "accountManager" ? (

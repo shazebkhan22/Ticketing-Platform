@@ -80,7 +80,7 @@ export function AccountManagerSelect({
         <SelectContent>
           {options.map((am) => (
             <SelectItem key={am.id} value={String(am.id)}>
-              {am.name} ({am.email})
+              {am.name}
             </SelectItem>
           ))}
           <SelectSeparator />
