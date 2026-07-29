@@ -29,7 +29,10 @@ const createProjectSchema = z.object({
   contractNumber: z.string().optional(),
   poNumber: z.string().optional(),
   problem: z.string().min(1),
-  accountManager: z.string().min(1),
+  // Unlike tickets' free-text Account Manager, projects require picking a
+  // real account_managers row — that's what makes the daily remarks digest
+  // (see jobs/dailyDigest.ts) able to reliably email someone.
+  accountManagerId: z.coerce.number().int().positive(),
   assignedBy: z.string().min(1),
   assigneeUserIds: z.array(z.coerce.number().int().positive()).min(1, "At least one assignee required"),
   priority: z.enum(TICKET_PRIORITIES).optional(),
@@ -70,6 +73,7 @@ function rowToProject(row: any) {
     problem: row.problem,
     ownerUserId: row.owner_user_id,
     accountManager: row.account_manager,
+    accountManagerId: row.account_manager_id,
     assignedBy: row.assigned_by,
     assignees: row.assignees ?? [],
     priority: row.priority,
@@ -124,6 +128,14 @@ async function insertAssignees(projectSrNo: number, userIds: number[]) {
     projectSrNo,
     ...userIds,
   ]);
+}
+
+// account_manager (text) is kept alongside account_manager_id so existing
+// filters/exports/display keep working unchanged — only the id is
+// authoritative for resolving an email (see jobs/dailyDigest.ts).
+async function resolveAccountManagerName(accountManagerId: number): Promise<string | null> {
+  const result = await pool.query("SELECT name FROM account_managers WHERE id = $1", [accountManagerId]);
+  return result.rows[0]?.name ?? null;
 }
 
 export async function listProjects(req: Request, res: Response) {
@@ -283,6 +295,11 @@ export async function createProject(req: Request, res: Response) {
     return res.status(assigneeCheck.status).json({ error: assigneeCheck.error });
   }
 
+  const accountManagerName = await resolveAccountManagerName(d.accountManagerId);
+  if (accountManagerName === null) {
+    return res.status(400).json({ error: "Invalid account manager" });
+  }
+
   const startDate = new Date(d.startDate);
   const projectNo = await generateProjectNumber(startDate);
   const deadlineDate = computeDeadline(d.startDate, d.timeValue, d.timeUnit);
@@ -302,8 +319,8 @@ export async function createProject(req: Request, res: Response) {
       project_no, start_date, time_value, time_unit, deadline_date, customer_id,
       company_name, contact_name, contact_no, email_id, designation, department, address,
       components, po_number, contract_number, problem, owner_user_id,
-      account_manager, assigned_by, priority
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+      account_manager, account_manager_id, assigned_by, priority
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
     RETURNING *`,
     [
       projectNo,
@@ -324,7 +341,8 @@ export async function createProject(req: Request, res: Response) {
       d.contractNumber ?? null,
       d.problem,
       ownerUserId,
-      d.accountManager,
+      accountManagerName,
+      d.accountManagerId,
       d.assignedBy,
       d.priority ?? "P3",
     ]
@@ -372,7 +390,6 @@ export async function updateProject(req: Request, res: Response) {
     poNumber: "po_number",
     contractNumber: "contract_number",
     problem: "problem",
-    accountManager: "account_manager",
     assignedBy: "assigned_by",
     priority: "priority",
   };
@@ -384,6 +401,19 @@ export async function updateProject(req: Request, res: Response) {
       params.push((d as any)[key]);
       setClauses.push(`${column} = $${params.length}`);
     }
+  }
+
+  // account_manager (text) is always kept in sync with account_manager_id —
+  // never set independently, unlike the plain scalar fields above.
+  if (d.accountManagerId !== undefined) {
+    const accountManagerName = await resolveAccountManagerName(d.accountManagerId);
+    if (accountManagerName === null) {
+      return res.status(400).json({ error: "Invalid account manager" });
+    }
+    params.push(accountManagerName);
+    setClauses.push(`account_manager = $${params.length}`);
+    params.push(d.accountManagerId);
+    setClauses.push(`account_manager_id = $${params.length}`);
   }
 
   // JSONB column — needs serializing, unlike the scalar fields in fieldMap.

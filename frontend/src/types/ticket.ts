@@ -134,6 +134,12 @@ export interface CustomerDirectoryEntry {
   address: string | null;
 }
 
+export interface AccountManagerDirectoryEntry {
+  id: number;
+  name: string;
+  email: string;
+}
+
 export interface MetaOptions {
   modes: TicketMode[];
   callTypes: CallType[];
@@ -146,6 +152,7 @@ export interface MetaOptions {
   companyNames: string[];
   customers: CustomerDirectoryEntry[];
   assignedToOptions: Employee[];
+  accountManagerDirectory: AccountManagerDirectoryEntry[];
 }
 
 export interface TicketListResponse {

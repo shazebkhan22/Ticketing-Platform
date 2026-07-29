@@ -45,6 +45,13 @@ export async function getOptions(_req: Request, res: Response) {
     "SELECT name, contact_name, contact_no, email_id, address FROM customers ORDER BY name"
   );
 
+  // Project's Account Manager field is a dropdown (unlike tickets' free-text
+  // one above) so every project can be reliably emailed for the daily
+  // remarks digest — see jobs/dailyDigest.ts and controllers/projects.ts.
+  const accountManagerDirectoryResult = await pool.query(
+    "SELECT id, name, email FROM account_managers ORDER BY name"
+  );
+
   res.json({
     modes: TICKET_MODES,
     callTypes: CALL_TYPES,
@@ -66,6 +73,11 @@ export async function getOptions(_req: Request, res: Response) {
       id: r.id,
       displayName: r.display_name,
       role: r.role,
+    })),
+    accountManagerDirectory: accountManagerDirectoryResult.rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
     })),
   });
 }

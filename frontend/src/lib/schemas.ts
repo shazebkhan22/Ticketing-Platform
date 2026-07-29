@@ -70,7 +70,7 @@ export const projectFormSchema = z.object({
   poNumber: z.string().optional(),
   contractNumber: z.string().optional(),
   problem: z.string().min(1, "Required"),
-  accountManager: z.string().min(1, "Required"),
+  accountManagerId: z.number().int().positive("Required"),
   assignedBy: z.string().min(1, "Required"),
   assigneeUserIds: z.array(z.number().int().positive()).min(1, "Select at least one employee"),
   priority: z.string().min(1, "Required"),

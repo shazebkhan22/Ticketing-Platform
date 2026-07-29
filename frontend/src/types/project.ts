@@ -32,6 +32,7 @@ export interface Project {
   problem: string;
   ownerUserId: number;
   accountManager: string;
+  accountManagerId: number | null;
   assignedBy: string | null;
   assignees: Employee[];
   priority: TicketPriority;
@@ -97,7 +98,7 @@ export interface ProjectFormInput {
   poNumber?: string;
   contractNumber?: string;
   problem: string;
-  accountManager: string;
+  accountManagerId: number;
   assignedBy: string;
   assigneeUserIds: number[];
   priority?: TicketPriority;

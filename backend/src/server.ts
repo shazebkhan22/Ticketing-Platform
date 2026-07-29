@@ -3,6 +3,7 @@ import { env } from "./config/env";
 import { logger } from "./utils/logger";
 import { startFeedbackReminderJob } from "./jobs/feedbackReminder";
 import { startAnalyticsRefreshJob } from "./jobs/analyticsRefresh";
+import { startDailyDigestJob } from "./jobs/dailyDigest";
 
 app.listen(env.port, () => {
   logger.info(`Cygnus Ticketing backend listening on port ${env.port}`);
@@ -10,3 +11,4 @@ app.listen(env.port, () => {
 
 startFeedbackReminderJob();
 startAnalyticsRefreshJob();
+startDailyDigestJob();

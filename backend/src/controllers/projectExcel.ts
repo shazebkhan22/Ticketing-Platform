@@ -430,6 +430,17 @@ export async function importProjects(req: Request, res: Response) {
     employeesResult.rows.map((r) => [r.display_name.toLowerCase(), r.id as number])
   );
 
+  // Best-effort match against the account_managers directory (see
+  // migrations/1785160000000_add-account-managers.sql) by exact name — lets
+  // a bulk-imported project still get picked up by the daily remarks digest
+  // (jobs/dailyDigest.ts) without requiring every importer to know the
+  // directory's exact spelling. No match just leaves account_manager_id
+  // NULL, same as a project whose account manager predates the directory.
+  const accountManagersResult = await pool.query("SELECT id, name FROM account_managers");
+  const accountManagerIdByName = new Map(
+    accountManagersResult.rows.map((r) => [r.name.toLowerCase(), r.id as number])
+  );
+
   const ownerUserId = req.session.userId;
   const results: ImportRowResult[] = [];
 
@@ -507,13 +518,14 @@ export async function importProjects(req: Request, res: Response) {
         address: d.address,
       });
       const components = parseComponentsFromExcel(d.components);
+      const accountManagerId = accountManagerIdByName.get(d.accountManager.toLowerCase()) ?? null;
       const inserted = await pool.query(
         `INSERT INTO projects (
           project_no, start_date, time_value, time_unit, deadline_date, customer_id,
           company_name, contact_name, contact_no, email_id, designation, department, address,
           components, po_number, contract_number, problem, owner_user_id,
-          account_manager, assigned_by, priority, status
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+          account_manager, account_manager_id, assigned_by, priority, status
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
         RETURNING sr_no`,
         [
           projectNo,
@@ -535,6 +547,7 @@ export async function importProjects(req: Request, res: Response) {
           d.problem,
           ownerUserId,
           d.accountManager,
+          accountManagerId,
           d.assignedBy,
           d.priority ?? "P3",
           d.status ?? "Pending",

@@ -57,7 +57,7 @@ export function ActivityLogPage() {
                     <TableCell className="whitespace-nowrap text-sm text-neutral-500">
                       {formatDateTime(entry.createdAt)}
                     </TableCell>
-                    <TableCell className="text-sm font-medium">{entry.actorName}</TableCell>
+                    <TableCell className="text-sm font-medium capitalize">{entry.actorName}</TableCell>
                     <TableCell className="text-sm">{entry.action}</TableCell>
                     <TableCell className="text-sm">
                       {entry.ticketSrNo ? (

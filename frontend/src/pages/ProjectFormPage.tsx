@@ -53,7 +53,7 @@ const EMPTY_FORM: ProjectFormValues = {
   poNumber: "",
   contractNumber: "",
   problem: "",
-  accountManager: "",
+  accountManagerId: 0,
   assignedBy: "",
   assigneeUserIds: [],
   priority: "P3",
@@ -79,7 +79,7 @@ function projectToFormValues(project: ProjectDetail["project"]): ProjectFormValu
     poNumber: project.poNumber ?? "",
     contractNumber: project.contractNumber ?? "",
     problem: project.problem,
-    accountManager: project.accountManager,
+    accountManagerId: project.accountManagerId ?? 0,
     assignedBy: project.assignedBy ?? "",
     assigneeUserIds: project.assignees.map((a) => a.id),
     priority: project.priority,
@@ -487,20 +487,27 @@ export function ProjectFormPage() {
 
             <FormField
               control={form.control}
-              name="accountManager"
+              name="accountManagerId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Account Manager<span className="text-red-500">*</span></FormLabel>
-                  <FormControl>
-                    <Combobox
-                      value={field.value}
-                      onChange={field.onChange}
-                      options={options.accountManagers.map((a) => ({ value: a, label: a }))}
-                      placeholder="Person in the office who handles the account"
-                      searchPlaceholder="Search or type a name..."
-                      allowCustomValue
-                    />
-                  </FormControl>
+                  <Select
+                    value={field.value ? String(field.value) : undefined}
+                    onValueChange={(v) => field.onChange(Number(v))}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select an account manager" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {options.accountManagerDirectory.map((am) => (
+                        <SelectItem key={am.id} value={String(am.id)}>
+                          {am.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
