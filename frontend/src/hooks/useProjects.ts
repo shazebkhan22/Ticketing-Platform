@@ -3,9 +3,12 @@ import {
   addProjectRemark,
   createProject,
   deleteProject,
+  downloadProjectImportTemplate,
+  exportProjects,
   fetchProject,
   fetchProjects,
   fetchProjectSummary,
+  importProjects,
   updateProject,
   updateProjectStatus,
 } from "@/api/projects";
@@ -108,5 +111,27 @@ export function useAddProjectRemark(srNo: number) {
   return useMutation({
     mutationFn: (body: string) => addProjectRemark(srNo, body),
     onSuccess: invalidate,
+  });
+}
+
+export function useExportProjects() {
+  return useMutation({
+    mutationFn: (filters: ProjectFilters) => exportProjects(filters),
+  });
+}
+
+export function useDownloadProjectImportTemplate() {
+  return useMutation({
+    mutationFn: () => downloadProjectImportTemplate(),
+  });
+}
+
+export function useImportProjects() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => importProjects(file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: projectKeys.all });
+    },
   });
 }

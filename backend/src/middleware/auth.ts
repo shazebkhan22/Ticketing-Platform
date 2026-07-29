@@ -49,7 +49,7 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
  * a ticket can be created by one employee and assigned to others, and the
  * assignees are who get edit rights, not the creator.
  */
-export async function requireAssigneeOrAdmin(req: Request, res: Response, next: NextFunction) {
+export async function requireTicketAssigneeOrAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Not authenticated" });
   }
@@ -71,6 +71,38 @@ export async function requireAssigneeOrAdmin(req: Request, res: Response, next: 
   );
   if (membership.rows.length === 0) {
     return res.status(403).json({ error: "You can only modify tickets assigned to you" });
+  }
+  next();
+}
+
+/**
+ * Same rule as requireTicketAssigneeOrAdmin, but for project_assignees — used only
+ * on the project remarks route. Full project edit rights (create/update/
+ * delete/status) stay admin-only (see routes/projects.ts); assignees may
+ * only add remarks, same as an employee's day-to-day ticket updates.
+ */
+export async function requireProjectAssigneeOrAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  if (req.session.role === "admin") {
+    return next();
+  }
+
+  const srNo = parseInt(req.params.srNo, 10);
+  const projectResult = await pool.query(
+    "SELECT 1 FROM projects WHERE sr_no = $1 AND deleted_at IS NULL",
+    [srNo]
+  );
+  if (projectResult.rows.length === 0) {
+    return res.status(404).json({ error: "Project not found" });
+  }
+  const membership = await pool.query(
+    "SELECT 1 FROM project_assignees WHERE project_sr_no = $1 AND user_id = $2",
+    [srNo, req.session.userId]
+  );
+  if (membership.rows.length === 0) {
+    return res.status(403).json({ error: "You can only modify projects assigned to you" });
   }
   next();
 }

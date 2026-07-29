@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { format, parse, isValid } from "date-fns";
 import { toast } from "sonner";
 import { projectRemarkSchema as remarkSchema } from "@/lib/schemas";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,6 +15,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+function parseIsoDate(value?: string | null): Date | undefined {
+  if (!value) return undefined;
+  const parsed = parse(value.slice(0, 10), "yyyy-MM-dd", new Date());
+  return isValid(parsed) ? parsed : undefined;
+}
 
 function Field({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -36,6 +51,12 @@ export function ProjectDetailPage() {
 
   const [newRemark, setNewRemark] = useState("");
   const [remarkError, setRemarkError] = useState<string | null>(null);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [installationDateChoice, setInstallationDateChoice] = useState<"deadline" | "custom">("deadline");
+  const [customInstallationDate, setCustomInstallationDate] = useState<string | undefined>(undefined);
+  const [confirmedInstallationDate, setConfirmedInstallationDate] = useState<string | undefined>(undefined);
+  const [installationTime, setInstallationTime] = useState("");
+  const [confirmedInstallationTime, setConfirmedInstallationTime] = useState("");
 
   if (isLoading || !data) {
     return (
@@ -51,7 +72,8 @@ export function ProjectDetailPage() {
   const currentStatusIndex = STATUS_FLOW.indexOf(project.status);
   // Edit rights are admin-only for projects (unlike tickets, where assignees
   // can also edit) — see routes/projects.ts.
-  const canEdit = user?.role === "admin";
+  const canEdit = user?.role === "admin"|| project.assignees.some((a) => a.id === user?.id);
+
 
   async function handleAddRemark() {
     const parsed = remarkSchema.safeParse(newRemark);
@@ -93,11 +115,75 @@ export function ProjectDetailPage() {
           modelText={modelText}
           serialText={serialText}
           dateLabel="Installation Date"
-          date={formatDate(project.startDate)}
+          date={confirmedInstallationDate ? formatDate(confirmedInstallationDate) : formatDate(project.deadlineDate)}
+          time={confirmedInstallationTime}
           engineerName={engineerName}
           status={project.status}
         />
       </div>
+
+      <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Installation Date</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <label className="flex items-center gap-2 text-sm text-neutral-800">
+              <input
+                type="radio"
+                name="installationDateChoice"
+                checked={installationDateChoice === "deadline"}
+                onChange={() => setInstallationDateChoice("deadline")}
+              />
+              Use deadline ({formatDate(project.deadlineDate)})
+            </label>
+            <label className="flex items-center gap-2 text-sm text-neutral-800">
+              <input
+                type="radio"
+                name="installationDateChoice"
+                checked={installationDateChoice === "custom"}
+                onChange={() => setInstallationDateChoice("custom")}
+              />
+              Custom date
+            </label>
+            <DateTimePicker
+              date={
+                installationDateChoice === "custom"
+                  ? parseIsoDate(customInstallationDate)
+                  : parseIsoDate(project.deadlineDate)
+              }
+              onDateChange={(d) => setCustomInstallationDate(d ? format(d, "yyyy-MM-dd") : undefined)}
+              dateDisabled={installationDateChoice === "deadline"}
+              time={installationTime}
+              onTimeChange={setInstallationTime}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPrintDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={installationDateChoice === "custom" && !customInstallationDate}
+              onClick={() => {
+                setConfirmedInstallationDate(
+                  installationDateChoice === "custom" ? customInstallationDate : project.deadlineDate
+                );
+                setConfirmedInstallationTime(installationTime);
+                setPrintDialogOpen(false);
+                const prevTitle = document.title;
+                document.title = `Installation Report - ${project.projectNo}`;
+                // Wait a tick so the report re-renders with the chosen date before print().
+                setTimeout(() => {
+                  window.print();
+                  document.title = prevTitle;
+                }, 0);
+              }}
+            >
+              Print
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="print:hidden">
       <div className="no-print mb-6 flex items-center justify-between">
@@ -109,7 +195,15 @@ export function ProjectDetailPage() {
         </div>
         <div className="flex gap-2">
           {project.status === "Closed" && (
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setInstallationDateChoice("deadline");
+              setCustomInstallationDate(undefined);
+              setInstallationTime(format(new Date(), "HH:mm:ss"));
+              setPrintDialogOpen(true);
+            }}
+          >
             Print
           </Button>
           )}

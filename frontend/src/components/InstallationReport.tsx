@@ -14,6 +14,7 @@ export interface InstallationReportProps {
   serialText: string;
   dateLabel: string;
   date?: string | null;
+  time?: string | null;
   engineerName?: string | null;
   status?: string | null;
 }
@@ -54,6 +55,7 @@ export function InstallationReport({
   serialText,
   dateLabel,
   date,
+  time,
   engineerName,
   status,
 }: InstallationReportProps) {
@@ -63,7 +65,7 @@ export function InstallationReport({
         <img src="/Cygnus Exp.png" className="h-8" />
       </div>
 
-      <div className="border-b border-black bg-slate-100 px-3 py-1.5 text-center text-[13pt] font-bold">
+      <div className="border-b border-black bg-blue-200 px-3 py-1.5 text-center text-[13pt] font-bold">
         {title}
       </div>
 
@@ -114,7 +116,7 @@ export function InstallationReport({
       </Row>
       <Row>
         <div className="grid grid-cols-2">
-          <Cell label="Time" value="" className="border-r border-black" />
+          <Cell label="Time" value={time} className="border-r border-black" />
           <Cell label="Status" value={status=="Closed"?"Completed":"Open"
           } />
         </div>

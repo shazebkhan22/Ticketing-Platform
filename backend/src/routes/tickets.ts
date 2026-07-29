@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { requireAuth, requireAdmin, requireAssigneeOrAdmin, validateSrNoParam } from "../middleware/auth";
+import { requireAuth, requireAdmin, requireTicketAssigneeOrAdmin, validateSrNoParam } from "../middleware/auth";
 import {
   listTickets,
   getSummary,
@@ -43,10 +43,10 @@ ticketsRouter.get("/:srNo", validateSrNoParam, getTicket);
 ticketsRouter.post("/", createTicket);
 
 // Write routes: admin can modify any ticket; otherwise only an employee the
-// ticket is currently ASSIGNED TO can modify it (requireAssigneeOrAdmin checks
+// ticket is currently ASSIGNED TO can modify it (requireTicketAssigneeOrAdmin checks
 // membership in ticket_assignees against the session) — not whoever created it.
-ticketsRouter.put("/:srNo", validateSrNoParam, requireAssigneeOrAdmin, updateTicket);
-ticketsRouter.patch("/:srNo/status", validateSrNoParam, requireAssigneeOrAdmin, updateTicketStatus);
+ticketsRouter.put("/:srNo", validateSrNoParam, requireTicketAssigneeOrAdmin, updateTicket);
+ticketsRouter.patch("/:srNo/status", validateSrNoParam, requireTicketAssigneeOrAdmin, updateTicketStatus);
 // Admin-only, unlike the other write routes above — this is a formal reply
 // to the customer's feedback, not day-to-day ticket work any assignee does.
 ticketsRouter.patch(
@@ -55,5 +55,5 @@ ticketsRouter.patch(
   requireAdmin,
   updateAdminFeedbackResponse
 );
-ticketsRouter.delete("/:srNo", validateSrNoParam, requireAssigneeOrAdmin, deleteTicket);
-ticketsRouter.post("/:srNo/remarks", validateSrNoParam, requireAssigneeOrAdmin, addRemark);
+ticketsRouter.delete("/:srNo", validateSrNoParam, requireTicketAssigneeOrAdmin, deleteTicket);
+ticketsRouter.post("/:srNo/remarks", validateSrNoParam, requireTicketAssigneeOrAdmin, addRemark);

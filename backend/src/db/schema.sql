@@ -104,7 +104,7 @@ CREATE INDEX idx_tickets_ticket_date ON tickets(ticket_date);
 CREATE INDEX idx_tickets_company_name ON tickets(company_name);
 
 -- Many-to-many: a ticket can have multiple assignees, all of whom get full
--- edit rights (see requireAssigneeOrAdmin). No denormalized name column —
+-- edit rights (see requireTicketAssigneeOrAdmin). No denormalized name column —
 -- always join to users for display_name, since this repo already has one
 -- staleness gap from denormalizing names (customers.name copy) and there's
 -- no need to repeat it here.

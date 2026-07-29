@@ -32,7 +32,7 @@ const createTicketSchema = z.object({
   callType: z.enum(CALL_TYPES),
   // Assigned To = which of the platform employees will resolve this ticket.
   // A ticket can have multiple assignees, all of whom get full edit/delete
-  // rights (see requireAssigneeOrAdmin) — this is the actual permission
+  // rights (see requireTicketAssigneeOrAdmin) — this is the actual permission
   // record, not who created the ticket.
   assigneeUserIds: z.array(z.coerce.number().int().positive()).min(1, "At least one assignee required"),
   priority: z.enum(TICKET_PRIORITIES).optional(),

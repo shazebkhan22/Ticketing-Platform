@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { format, parse, isValid } from "date-fns";
 import { toast } from "sonner";
 import { StarIcon } from "lucide-react";
 import {
@@ -24,6 +25,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+function parseIsoDate(value?: string | null): Date | undefined {
+  if (!value) return undefined;
+  const parsed = parse(value.slice(0, 10), "yyyy-MM-dd", new Date());
+  return isValid(parsed) ? parsed : undefined;
+}
 
 function Field({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -49,6 +64,9 @@ export function TicketDetailPage() {
   const [remarkError, setRemarkError] = useState<string | null>(null);
   const [adminResponse, setAdminResponse] = useState<string | null>(null);
   const [adminResponseError, setAdminResponseError] = useState<string | null>(null);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [callTime, setCallTime] = useState("");
+  const [confirmedCallTime, setConfirmedCallTime] = useState("");
 
   if (isLoading || !data) {
     return (
@@ -109,10 +127,45 @@ export function TicketDetailPage() {
           serialText={ticket.serialNumber ?? ""}
           dateLabel="Date"
           date={formatDate(ticket.ticketDate)}
+          time={confirmedCallTime}
           engineerName={engineerName}
           status={ticket.status}
         />
       </div>
+
+      <Dialog open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Call Report Time</DialogTitle>
+          </DialogHeader>
+          <DateTimePicker
+            date={parseIsoDate(ticket.ticketDate)}
+            onDateChange={() => {}}
+            dateDisabled
+            time={callTime}
+            onTimeChange={setCallTime}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPrintDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setConfirmedCallTime(callTime);
+                setPrintDialogOpen(false);
+                const prevTitle = document.title;
+                document.title = `Call Report - ${ticket.ticketNo}`;
+                setTimeout(() => {
+                  window.print();
+                  document.title = prevTitle;
+                }, 0);
+              }}
+            >
+              Print
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="print:hidden">
       <div className="no-print mb-6 flex items-center justify-between">
@@ -128,7 +181,13 @@ export function TicketDetailPage() {
         </div>
         <div className="flex gap-2">
           {ticket.status === "Closed" && (
-          <Button variant="outline" onClick={() => window.print()}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setCallTime(format(new Date(), "HH:mm:ss"));
+              setPrintDialogOpen(true);
+            }}
+          >
             Print
           </Button>
           )}

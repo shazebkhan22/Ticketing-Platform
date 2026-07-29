@@ -1,7 +1,15 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import { useProjectList, useProjectMetaOptions, useProjectSummary } from "@/hooks/useProjects";
+import {
+  useDownloadProjectImportTemplate,
+  useExportProjects,
+  useImportProjects,
+  useProjectList,
+  useProjectMetaOptions,
+  useProjectSummary,
+} from "@/hooks/useProjects";
 import type { ProjectFilters } from "@/types/project";
 import { SUMMARY_CARDS, ALL_FILTER_VALUE, DEFAULT_PROJECT_FILTERS } from "@/constants/dashboard";
 import { PRIORITY_CLASSES, PRIORITY_LABELS } from "@/constants/ticket";
@@ -30,6 +38,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function ProjectsDashboardPage() {
   const navigate = useNavigate();
@@ -58,6 +76,58 @@ export function ProjectsDashboardPage() {
   const total = projectsResponse?.total ?? 0;
 
   const isAdmin = user?.role === "admin";
+  const exportMutation = useExportProjects();
+  const importMutation = useImportProjects();
+  const templateMutation = useDownloadProjectImportTemplate();
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [exportConfirmOpen, setExportConfirmOpen] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+
+  async function handleExport() {
+    setExportConfirmOpen(false);
+    try {
+      await exportMutation.mutateAsync(effectiveFilters);
+    } catch {
+      toast.error("Failed to export projects");
+    }
+  }
+
+  async function handleDownloadTemplate() {
+    try {
+      await templateMutation.mutateAsync();
+    } catch {
+      toast.error("Failed to download template");
+    }
+  }
+
+  function handleImportFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPendingImportFile(file);
+  }
+
+  async function handleConfirmImport() {
+    const file = pendingImportFile;
+    setPendingImportFile(null);
+    if (!file) return;
+    try {
+      const result = await importMutation.mutateAsync(file);
+      if (result.failedCount === 0) {
+        toast.success(`Imported ${result.created} project(s)`);
+      } else if (result.created === 0) {
+        toast.error(
+          `Import failed for all ${result.failedCount} row(s). First error: ${result.errors[0]?.error}`,
+        );
+      } else {
+        toast.warning(
+          `Imported ${result.created} project(s), ${result.failedCount} row(s) failed. First error (row ${result.errors[0]?.row}): ${result.errors[0]?.error}`,
+        );
+      }
+    } catch {
+      toast.error("Failed to import file");
+    }
+  }
 
   function updateFilter<K extends keyof ProjectFilters>(key: K, value: ProjectFilters[K]) {
     setFilters((prev) => ({
@@ -84,11 +154,83 @@ export function ProjectsDashboardPage() {
       <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-bold text-neutral-800">Projects</h2>
         {isAdmin && (
-          <Button variant="default" onClick={() => navigate("/projects/new")}>
-            + New Project
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setExportConfirmOpen(true)}
+              disabled={exportMutation.isPending}
+            >
+              {exportMutation.isPending ? "Exporting..." : "Export"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDownloadTemplate}
+              disabled={templateMutation.isPending}
+            >
+              Download Template
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => importInputRef.current?.click()}
+              disabled={importMutation.isPending}
+            >
+              {importMutation.isPending ? "Importing..." : "Import"}
+            </Button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={handleImportFileSelected}
+            />
+            <Button variant="default" onClick={() => navigate("/projects/new")}>
+              + New Project
+            </Button>
+          </div>
         )}
       </div>
+
+      <AlertDialog open={exportConfirmOpen} onOpenChange={setExportConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Export projects to Excel?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will download an .xlsx file of every project matching your
+              current filters (not just the current page).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleExport}>Export</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendingImportFile !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingImportFile(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Import projects from "{pendingImportFile?.name}" ?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will create a new project for every valid row in the file.
+              Rows that fail validation will be skipped and reported — this
+              cannot be undone in bulk, so make sure this is the right file.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmImport}>
+              Import
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-5">
         {SUMMARY_CARDS.map((card) => (

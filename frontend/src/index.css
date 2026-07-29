@@ -23,6 +23,17 @@ body {
     display: none !important;
   }
 
+  /* Dialog/AlertDialog content renders via a portal straight under <body>,
+     outside any print:hidden wrapper an individual page adds — if one is
+     still open (or mid-close-animation) when window.print() fires, it would
+     otherwise show up in the printed output regardless of which page. */
+  [data-slot="dialog-overlay"],
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-overlay"],
+  [data-slot="alert-dialog-content"] {
+    display: none !important;
+  }
+
   @page {
     margin: 5mm;
   }

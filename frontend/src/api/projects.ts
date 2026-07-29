@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { Summary } from "@/types/ticket";
+import type { ImportResult, Summary } from "@/types/ticket";
 import type {
   Project,
   ProjectDetail,
@@ -7,6 +7,42 @@ import type {
   ProjectFormInput,
   ProjectListResponse,
 } from "@/types/project";
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+export async function exportProjects(filters: ProjectFilters): Promise<void> {
+  const params: Record<string, string> = {};
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== "" && key !== "page" && key !== "pageSize") {
+      params[key] = String(value);
+    }
+  });
+  const { data } = await apiClient.get("/projects/export", { params, responseType: "blob" });
+  triggerDownload(data, `projects-export-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+export async function downloadProjectImportTemplate(): Promise<void> {
+  const { data } = await apiClient.get("/projects/import-template", { responseType: "blob" });
+  triggerDownload(data, "project-import-template.xlsx");
+}
+
+export async function importProjects(file: File): Promise<ImportResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await apiClient.post<ImportResult>("/projects/import", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
 
 export async function fetchProjectSummary(assigneeUserId?: number): Promise<Summary> {
   const { data } = await apiClient.get<Summary>("/projects/summary", {
