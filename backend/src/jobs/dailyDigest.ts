@@ -14,6 +14,7 @@ interface DigestRemarkRow {
   body: string;
   created_by: string | null;
   created_at: Date;
+  highlighted: boolean;
 }
 
 // Runs once a day, emailing each account manager a summary of every remark
@@ -25,7 +26,7 @@ async function runDailyDigest() {
   const result = await pool.query<DigestRemarkRow>(
     `SELECT am.id AS am_id, am.name AS am_name, am.email AS am_email,
        p.sr_no, p.project_no, p.company_name,
-       r.body, r.created_by, r.created_at
+       r.body, r.created_by, r.created_at, r.highlighted
      FROM project_remarks r
      JOIN projects p ON p.sr_no = r.project_sr_no AND p.deleted_at IS NULL
      JOIN account_managers am ON am.id = p.account_manager_id
@@ -49,26 +50,46 @@ async function runDailyDigest() {
   }
 
   for (const manager of byManager.values()) {
-    const sections = [...manager.projects.values()].map((remarks) => {
+    const projectRemarkLists = [...manager.projects.values()];
+
+    // Two parallel renderings of the same remark line — plain text keeps
+    // highlighted remarks readable (no markup) since it's the non-HTML
+    // fallback body; the HTML version wraps them in <strong> so they
+    // actually render bold in an email client. renderEmailHtml only
+    // transforms "\n"/"\n\n", so the <strong> tags pass through untouched.
+    function remarkLine(r: DigestRemarkRow): string {
+      return `  - ${r.created_at.toISOString().slice(0, 16).replace("T", " ")}${
+        r.created_by ? ` (${r.created_by})` : ""
+      }: ${r.body}`;
+    }
+
+    const textSections = projectRemarkLists.map((remarks) => {
       const { project_no, company_name } = remarks[0];
-      const lines = remarks.map(
-        (r) =>
-          `  - ${r.created_at.toISOString().slice(0, 16).replace("T", " ")}${
-            r.created_by ? ` (${r.created_by})` : ""
-          }: ${r.body}`
+      const lines = remarks.map((r) => (r.highlighted ? `${remarkLine(r)} [HIGHLIGHT]` : remarkLine(r)));
+      return `${project_no} — ${company_name}\n${lines.join("\n")}`;
+    });
+
+    const htmlSections = projectRemarkLists.map((remarks) => {
+      const { project_no, company_name } = remarks[0];
+      const lines = remarks.map((r) =>
+        r.highlighted ? `<strong>${remarkLine(r)}</strong>` : remarkLine(r)
       );
       return `${project_no} — ${company_name}\n${lines.join("\n")}`;
     });
 
-    const text = `Dear ${manager.name},\n\nHere is a summary of remarks added to your projects in the last 24 hours:\n\n${sections.join(
+    const text = `Dear ${manager.name},\n\nHere is a summary of remarks added to your projects in the last 24 hours:\n\n${textSections.join(
+      "\n\n"
+    )}\n\nBest regards,\nCygnus Ticketing System`;
+
+    const html = `Dear ${manager.name},\n\nHere is a summary of remarks added to your projects in the last 24 hours:\n\n${htmlSections.join(
       "\n\n"
     )}\n\nBest regards,\nCygnus Ticketing System`;
 
     await sendMail({
       to: manager.email,
-      subject: `Daily Project Remarks Digest — ${sections.length} project(s) updated`,
+      subject: `Daily Project Remarks Digest — ${textSections.length} project(s) updated`,
       text,
-      html: renderEmailHtml(text),
+      html: renderEmailHtml(html),
     });
   }
 }

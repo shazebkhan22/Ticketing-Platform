@@ -2,6 +2,7 @@ import { apiClient } from "./client";
 import type { ImportResult, Summary } from "@/types/ticket";
 import type {
   Project,
+  ProjectAnalytics,
   ProjectDetail,
   ProjectFilters,
   ProjectFormInput,
@@ -51,6 +52,11 @@ export async function fetchProjectSummary(assigneeUserId?: number): Promise<Summ
   return data;
 }
 
+export async function fetchProjectAnalytics(): Promise<ProjectAnalytics> {
+  const { data } = await apiClient.get<ProjectAnalytics>("/projects/analytics");
+  return data;
+}
+
 export async function fetchProjects(filters: ProjectFilters): Promise<ProjectListResponse> {
   const params: Record<string, string> = {};
   Object.entries(filters).forEach(([key, value]) => {
@@ -96,4 +102,12 @@ export async function addProjectRemark(
   remarkDate?: string
 ): Promise<void> {
   await apiClient.post(`/projects/${srNo}/remarks`, { body, remarkDate });
+}
+
+export async function updateProjectRemarkHighlight(
+  srNo: number,
+  remarkId: number,
+  highlighted: boolean
+): Promise<void> {
+  await apiClient.patch(`/projects/${srNo}/remarks/${remarkId}/highlight`, { highlighted });
 }

@@ -66,6 +66,16 @@ export const STATUS_TO_CONFIG_KEY: Record<AnalyticsStatusCount["status"], keyof 
   Closed: "closed",
 };
 
+// Project analytics reuses VOLUME_CONFIG, PRIORITY_CONFIG, STATUS_CONFIG, and
+// EMPLOYEE_STATUS_CONFIG above (same shape as ticket analytics) — only the
+// account-manager breakdown needs its own single-series bar config.
+export const ACCOUNT_MANAGER_CONFIG = {
+  count: {
+    label: "Projects",
+    color: "var(--chart-4)",
+  },
+} satisfies ChartConfig;
+
 export function toPieData<T extends { count: number }>(
   rows: T[] | undefined,
   keyOf: (row: T) => string

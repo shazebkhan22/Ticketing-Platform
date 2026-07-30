@@ -9,12 +9,14 @@ import {
 import {
   listProjects,
   getSummary,
+  getProjectAnalytics,
   getProject,
   createProject,
   updateProject,
   updateProjectStatus,
   deleteProject,
   addRemark,
+  updateRemarkHighlight,
 } from "../controllers/projects";
 import {
   exportProjects,
@@ -31,8 +33,12 @@ export const projectsRouter = Router();
 
 projectsRouter.use(requireAuth);
 
-// Read routes: any authenticated user (admin or employee) can view projects.
+// Read routes: any authenticated user can call these, but non-admins only
+// ever see projects they're assigned to — enforced inside each controller
+// (listProjects/getSummary/getProject/exportProjects), not here, since it's
+// a data-scoping rule rather than an all-or-nothing route gate.
 projectsRouter.get("/summary", getSummary);
+projectsRouter.get("/analytics", getProjectAnalytics);
 
 // Excel export/import — declared before "/:srNo" so they aren't swallowed by
 // that wildcard param route, same reasoning as routes/tickets.ts. Import is
@@ -53,3 +59,9 @@ projectsRouter.delete("/:srNo", validateSrNoParam, requireAdmin, deleteProject);
 // Remarks are the exception: same as tickets, an assignee can post day-to-day
 // updates on a project they're assigned to, even though they can't edit it.
 projectsRouter.post("/:srNo/remarks", validateSrNoParam, requireProjectAssigneeOrAdmin, addRemark);
+projectsRouter.patch(
+  "/:srNo/remarks/:remarkId/highlight",
+  validateSrNoParam,
+  requireProjectAssigneeOrAdmin,
+  updateRemarkHighlight
+);

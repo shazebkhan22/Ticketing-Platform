@@ -44,6 +44,7 @@ export interface Ticket {
   customerFeedbackSubmittedAt: string | null;
   adminFeedbackResponse: string | null;
   adminFeedbackRespondedAt: string | null;
+  adminFeedbackRespondedBy: string | null;
   internalTag: InternalTag;
   createdAt: string;
   updatedAt: string;

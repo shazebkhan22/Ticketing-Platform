@@ -149,12 +149,19 @@ export async function listProjects(req: Request, res: Response) {
   const conditions: string[] = ["p.deleted_at IS NULL"];
   const params: any[] = [];
 
+  // Non-admins only ever see projects they're assigned to — unlike tickets,
+  // where any employee can see the full list. Overrides whatever
+  // assigneeUserId the client sent, rather than trusting it, so a non-admin
+  // can't widen this by querying someone else's id.
+  const effectiveAssigneeUserId =
+    req.session.role === "admin" ? assigneeUserId : String(req.session.userId);
+
   if (status) {
     params.push(status);
     conditions.push(`p.status = $${params.length}`);
   }
-  if (assigneeUserId) {
-    params.push(parseInt(assigneeUserId, 10));
+  if (effectiveAssigneeUserId) {
+    params.push(parseInt(effectiveAssigneeUserId, 10));
     conditions.push(
       `EXISTS (SELECT 1 FROM project_assignees pa WHERE pa.project_sr_no = p.sr_no AND pa.user_id = $${params.length})`
     );
@@ -220,10 +227,14 @@ export async function listProjects(req: Request, res: Response) {
 
 export async function getSummary(req: Request, res: Response) {
   const { assigneeUserId } = req.query as Record<string, string>;
-  const whereClause = assigneeUserId
+  // Same non-admin scoping as listProjects — never trust a client-supplied
+  // assigneeUserId for a non-admin.
+  const effectiveAssigneeUserId =
+    req.session.role === "admin" ? assigneeUserId : String(req.session.userId);
+  const whereClause = effectiveAssigneeUserId
     ? "WHERE p.deleted_at IS NULL AND EXISTS (SELECT 1 FROM project_assignees pa WHERE pa.project_sr_no = p.sr_no AND pa.user_id = $1)"
     : "WHERE p.deleted_at IS NULL";
-  const params = assigneeUserId ? [parseInt(assigneeUserId, 10)] : [];
+  const params = effectiveAssigneeUserId ? [parseInt(effectiveAssigneeUserId, 10)] : [];
 
   const result = await pool.query(
     `
@@ -260,8 +271,20 @@ export async function getProject(req: Request, res: Response) {
   if (result.rows.length === 0) {
     return res.status(404).json({ error: "Project not found" });
   }
+
+  // Non-admins can only view projects they're assigned to (unlike tickets,
+  // which any employee can view) — 404 rather than 403 so a project's
+  // existence isn't disclosed to employees who aren't on it.
+  if (req.session.role !== "admin") {
+    const assignees: { id: number }[] = result.rows[0].assignees ?? [];
+    const isAssigned = assignees.some((a) => a.id === req.session.userId);
+    if (!isAssigned) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+  }
+
   const remarksResult = await pool.query(
-    "SELECT id, remark_date, body, created_by, created_at FROM project_remarks WHERE project_sr_no = $1 ORDER BY created_at ASC",
+    "SELECT id, remark_date, body, created_by, created_at, highlighted FROM project_remarks WHERE project_sr_no = $1 ORDER BY created_at ASC",
     [srNo]
   );
   res.json({
@@ -272,6 +295,7 @@ export async function getProject(req: Request, res: Response) {
       body: r.body,
       createdBy: r.created_by,
       createdAt: r.created_at,
+      highlighted: r.highlighted,
     })),
   });
 }
@@ -577,6 +601,84 @@ export async function deleteProject(req: Request, res: Response) {
   res.json({ success: true });
 }
 
+// Unlike tickets' getAnalytics (controllers/tickets.ts), which reads from
+// materialized views refreshed every 15 min (see jobs/analyticsRefresh.ts),
+// this computes directly on every call — projects is a much smaller table
+// and the Analytics page (admin-only, see AdminRoute) isn't hit often
+// enough to justify the same materialized-view machinery yet.
+export async function getProjectAnalytics(_req: Request, res: Response) {
+  const monthlyResult = await pool.query(`
+    WITH months AS (
+      SELECT date_trunc('month', now()) - (n || ' months')::interval AS month_start
+      FROM generate_series(0, 5) AS n
+    )
+    SELECT
+      to_char(m.month_start, 'Mon YYYY') AS month,
+      COUNT(*) FILTER (WHERE date_trunc('month', p.start_date) = m.month_start) AS created,
+      COUNT(*) FILTER (WHERE date_trunc('month', p.closed_at) = m.month_start) AS closed
+    FROM months m
+    LEFT JOIN projects p
+      ON p.deleted_at IS NULL
+      AND (date_trunc('month', p.start_date) = m.month_start OR date_trunc('month', p.closed_at) = m.month_start)
+    GROUP BY m.month_start
+    ORDER BY m.month_start
+  `);
+
+  const priorityResult = await pool.query(`
+    SELECT priority, COUNT(*) FROM projects WHERE deleted_at IS NULL GROUP BY priority ORDER BY priority
+  `);
+
+  const statusResult = await pool.query(`
+    SELECT status, COUNT(*) FROM projects WHERE deleted_at IS NULL GROUP BY status ORDER BY status
+  `);
+
+  const employeeResult = await pool.query(`
+    SELECT u.display_name AS employee,
+      COUNT(*) FILTER (WHERE p.status = 'Pending') AS pending,
+      COUNT(*) FILTER (WHERE p.status = 'In Progress') AS in_progress,
+      COUNT(*) FILTER (WHERE p.status = 'Closed') AS closed
+    FROM project_assignees pa
+    JOIN users u ON u.id = pa.user_id
+    JOIN projects p ON p.sr_no = pa.project_sr_no AND p.deleted_at IS NULL
+    GROUP BY u.display_name
+    ORDER BY u.display_name
+  `);
+
+  const accountManagerResult = await pool.query(`
+    SELECT COALESCE(account_manager, 'Unassigned') AS account_manager, COUNT(*)
+    FROM projects
+    WHERE deleted_at IS NULL
+    GROUP BY account_manager
+    ORDER BY COUNT(*) DESC
+  `);
+
+  res.json({
+    monthly: monthlyResult.rows.map((r) => ({
+      month: r.month,
+      created: parseInt(r.created, 10),
+      closed: parseInt(r.closed, 10),
+    })),
+    byPriority: priorityResult.rows.map((r) => ({
+      priority: r.priority,
+      count: parseInt(r.count, 10),
+    })),
+    byStatus: statusResult.rows.map((r) => ({
+      status: r.status,
+      count: parseInt(r.count, 10),
+    })),
+    byEmployee: employeeResult.rows.map((r) => ({
+      employee: r.employee,
+      pending: parseInt(r.pending, 10),
+      inProgress: parseInt(r.in_progress, 10),
+      closed: parseInt(r.closed, 10),
+    })),
+    byAccountManager: accountManagerResult.rows.map((r) => ({
+      accountManager: r.account_manager,
+      count: parseInt(r.count, 10),
+    })),
+  });
+}
+
 export async function addRemark(req: Request, res: Response) {
   const srNo = parseInt(req.params.srNo, 10);
   const parsed = remarkSchema.safeParse(req.body);
@@ -615,5 +717,42 @@ export async function addRemark(req: Request, res: Response) {
     body: result.rows[0].body,
     createdBy: result.rows[0].created_by,
     createdAt: result.rows[0].created_at,
+    highlighted: result.rows[0].highlighted,
+  });
+}
+
+const remarkHighlightSchema = z.object({
+  highlighted: z.boolean(),
+});
+
+export async function updateRemarkHighlight(req: Request, res: Response) {
+  const srNo = parseInt(req.params.srNo, 10);
+  const remarkId = parseInt(req.params.remarkId, 10);
+  if (!Number.isInteger(remarkId) || remarkId <= 0) {
+    return res.status(400).json({ error: "Invalid remark reference" });
+  }
+  const parsed = remarkHighlightSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const result = await pool.query(
+    `UPDATE project_remarks SET highlighted = $1
+     WHERE id = $2 AND project_sr_no = $3
+     RETURNING id, remark_date, body, created_by, created_at, highlighted`,
+    [parsed.data.highlighted, remarkId, srNo]
+  );
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: "Remark not found" });
+  }
+  const r = result.rows[0];
+
+  res.json({
+    id: r.id,
+    remarkDate: r.remark_date,
+    body: r.body,
+    createdBy: r.created_by,
+    createdAt: r.created_at,
+    highlighted: r.highlighted,
   });
 }

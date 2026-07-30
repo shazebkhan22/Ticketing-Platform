@@ -89,6 +89,7 @@ function rowToTicket(row: any) {
     customerFeedbackSubmittedAt: row.customer_feedback_submitted_at,
     adminFeedbackResponse: row.admin_feedback_response,
     adminFeedbackRespondedAt: row.admin_feedback_responded_at,
+    adminFeedbackRespondedBy: row.admin_feedback_responded_by,
     internalTag: row.internal_tag,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -595,9 +596,10 @@ export async function updateAdminFeedbackResponse(req: Request, res: Response) {
   }
 
   const result = await pool.query(
-    `UPDATE tickets SET admin_feedback_response = $1, admin_feedback_responded_at = now()
-     WHERE sr_no = $2 AND deleted_at IS NULL RETURNING *`,
-    [parsed.data.response, srNo]
+    `UPDATE tickets SET admin_feedback_response = $1, admin_feedback_responded_at = now(),
+       admin_feedback_responded_by = $2
+     WHERE sr_no = $3 AND deleted_at IS NULL RETURNING *`,
+    [parsed.data.response, req.session.username ?? "Unknown", srNo]
   );
   const ticket = result.rows[0];
 

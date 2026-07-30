@@ -301,6 +301,12 @@ export function TicketDetailPage() {
               <h4 className="mb-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
                 Admin Response
               </h4>
+              {ticket.adminFeedbackRespondedAt && (
+                <div className="mb-2 text-xs text-neutral-500">
+                  {formatDateTimeWithSeconds(ticket.adminFeedbackRespondedAt)}
+                  {ticket.adminFeedbackRespondedBy && ` · ${ticket.adminFeedbackRespondedBy}`}
+                </div>
+              )}
               {user?.role === "admin" ? (
                 <div className="no-print">
                   <Textarea
@@ -317,14 +323,20 @@ export function TicketDetailPage() {
                   {adminResponseError && (
                     <p className="mt-1 text-xs text-destructive">{adminResponseError}</p>
                   )}
-                  <Button
-                    variant="outline"
-                    onClick={handleAdminResponseSave}
-                    disabled={updateAdminFeedbackResponse.isPending}
-                    className="mt-2"
-                  >
-                    {updateAdminFeedbackResponse.isPending ? "Saving..." : "Save Response"}
-                  </Button>
+                  {adminResponseValue !== (ticket.adminFeedbackResponse ?? "") && (
+                    <Button
+                      variant="outline"
+                      onClick={handleAdminResponseSave}
+                      disabled={updateAdminFeedbackResponse.isPending}
+                      className="mt-2"
+                    >
+                      {updateAdminFeedbackResponse.isPending
+                        ? "Saving..."
+                        : ticket.adminFeedbackResponse
+                        ? "Update Response"
+                        : "Save Response"}
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-neutral-800">{adminResponseValue || "-"}</p>

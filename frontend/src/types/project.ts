@@ -55,6 +55,7 @@ export interface ProjectRemark {
   body: string;
   createdBy: string | null;
   createdAt: string;
+  highlighted: boolean;
 }
 
 export interface ProjectDetail {
@@ -81,6 +82,42 @@ export interface ProjectFilters {
   overdue?: string;
   page?: number;
   pageSize?: number;
+}
+
+export interface ProjectAnalyticsMonthlyPoint {
+  month: string;
+  created: number;
+  closed: number;
+}
+
+export interface ProjectAnalyticsPriorityCount {
+  priority: TicketPriority;
+  count: number;
+}
+
+export interface ProjectAnalyticsStatusCount {
+  status: TicketStatus;
+  count: number;
+}
+
+export interface ProjectAnalyticsEmployeeStatus {
+  employee: string;
+  pending: number;
+  inProgress: number;
+  closed: number;
+}
+
+export interface ProjectAnalyticsAccountManagerCount {
+  accountManager: string;
+  count: number;
+}
+
+export interface ProjectAnalytics {
+  monthly: ProjectAnalyticsMonthlyPoint[];
+  byPriority: ProjectAnalyticsPriorityCount[];
+  byStatus: ProjectAnalyticsStatusCount[];
+  byEmployee: ProjectAnalyticsEmployeeStatus[];
+  byAccountManager: ProjectAnalyticsAccountManagerCount[];
 }
 
 export interface ProjectFormInput {

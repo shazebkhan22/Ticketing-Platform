@@ -6,11 +6,13 @@ import {
   downloadProjectImportTemplate,
   exportProjects,
   fetchProject,
+  fetchProjectAnalytics,
   fetchProjects,
   fetchProjectSummary,
   importProjects,
   updateProject,
   updateProjectStatus,
+  updateProjectRemarkHighlight,
 } from "@/api/projects";
 import { fetchMetaOptions } from "@/api/tickets";
 import type { ProjectDetail, ProjectFilters, ProjectFormInput } from "@/types/project";
@@ -21,12 +23,20 @@ export const projectKeys = {
   list: (filters: ProjectFilters) => [...projectKeys.all, "list", filters] as const,
   detail: (srNo: number) => [...projectKeys.all, "detail", srNo] as const,
   meta: () => ["meta", "options"] as const,
+  analytics: () => [...projectKeys.all, "analytics"] as const,
 };
 
 export function useProjectSummary(assigneeUserId?: number) {
   return useQuery({
     queryKey: projectKeys.summary(assigneeUserId),
     queryFn: () => fetchProjectSummary(assigneeUserId),
+  });
+}
+
+export function useProjectAnalytics() {
+  return useQuery({
+    queryKey: projectKeys.analytics(),
+    queryFn: fetchProjectAnalytics,
   });
 }
 
@@ -110,6 +120,15 @@ export function useAddProjectRemark(srNo: number) {
   const invalidate = useInvalidateProject(srNo);
   return useMutation({
     mutationFn: (body: string) => addProjectRemark(srNo, body),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateProjectRemarkHighlight(srNo: number) {
+  const invalidate = useInvalidateProject(srNo);
+  return useMutation({
+    mutationFn: ({ remarkId, highlighted }: { remarkId: number; highlighted: boolean }) =>
+      updateProjectRemarkHighlight(srNo, remarkId, highlighted),
     onSuccess: invalidate,
   });
 }

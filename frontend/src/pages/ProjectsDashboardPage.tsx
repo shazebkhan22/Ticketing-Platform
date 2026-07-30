@@ -308,25 +308,27 @@ export function ProjectsDashboardPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="min-w-20 flex-1">
-            <label className="mb-1 block text-xs font-semibold text-neutral-500">Assigned To</label>
-            <Select
-              value={filters.assigneeUserId ? String(filters.assigneeUserId) : ALL_FILTER_VALUE}
-              onValueChange={updateAssigneeFilter}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_FILTER_VALUE}>All</SelectItem>
-                {options?.assignedToOptions.map((emp) => (
-                  <SelectItem key={emp.id} value={String(emp.id)}>
-                    {emp.displayName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {isAdmin && (
+            <div className="min-w-20 flex-1">
+              <label className="mb-1 block text-xs font-semibold text-neutral-500">Assigned To</label>
+              <Select
+                value={filters.assigneeUserId ? String(filters.assigneeUserId) : ALL_FILTER_VALUE}
+                onValueChange={updateAssigneeFilter}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_FILTER_VALUE}>All</SelectItem>
+                  {options?.assignedToOptions.map((emp) => (
+                    <SelectItem key={emp.id} value={String(emp.id)}>
+                      {emp.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="min-w-32 flex-1">
             <label className="mb-1 block text-xs font-semibold text-neutral-500">From</label>
             <DatePicker

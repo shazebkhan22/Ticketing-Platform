@@ -134,12 +134,17 @@ export async function exportProjects(req: Request, res: Response) {
   const conditions: string[] = ["p.deleted_at IS NULL"];
   const params: any[] = [];
 
+  // Same non-admin scoping as listProjects (controllers/projects.ts) — a
+  // non-admin's export can never include projects they aren't assigned to.
+  const effectiveAssigneeUserId =
+    req.session.role === "admin" ? assigneeUserId : String(req.session.userId);
+
   if (status) {
     params.push(status);
     conditions.push(`p.status = $${params.length}`);
   }
-  if (assigneeUserId) {
-    params.push(parseInt(assigneeUserId, 10));
+  if (effectiveAssigneeUserId) {
+    params.push(parseInt(effectiveAssigneeUserId, 10));
     conditions.push(
       `EXISTS (SELECT 1 FROM project_assignees pa WHERE pa.project_sr_no = p.sr_no AND pa.user_id = $${params.length})`
     );
@@ -175,10 +180,11 @@ export async function exportProjects(req: Request, res: Response) {
   const whereClause = `WHERE ${conditions.join(" AND ")}`;
   const result = await pool.query(
     `SELECT p.*,
-      (SELECT array_agg(
-         r.remark_date || ' ' || to_char(r.created_at, 'HH24:MI')
-           || COALESCE(' (' || r.created_by || ')', '') || ': ' || r.body
-         ORDER BY r.created_at)
+      (SELECT json_agg(json_build_object(
+         'text', r.remark_date || ' ' || to_char(r.created_at, 'HH24:MI')
+           || COALESCE(' (' || r.created_by || ')', '') || ': ' || r.body,
+         'highlighted', r.highlighted
+       ) ORDER BY r.created_at)
        FROM project_remarks r WHERE r.project_sr_no = p.sr_no) AS remarks_list,
       (SELECT string_agg(u.display_name, ', ' ORDER BY u.display_name)
        FROM project_assignees pa JOIN users u ON u.id = pa.user_id
@@ -206,9 +212,21 @@ export async function exportProjects(req: Request, res: Response) {
   const componentsColLetter = sheet.getColumn("components").letter;
 
   result.rows.forEach((row, i) => {
-    const remarksList: string[] = row.remarks_list ?? [];
+    const remarksList: { text: string; highlighted: boolean }[] = row.remarks_list ?? [];
     const components: ProjectComponent[] = row.components ?? [];
     const componentsSummary = formatComponentsForExcel(components);
+
+    // Prefer the most recent HIGHLIGHTED remark as the visible cell's
+    // default value (falling back to the plain last remark) — the cell
+    // also gets an orange fill below so a highlighted project's important
+    // update is visible without opening the dropdown.
+    const highlightedRemarks = remarksList.filter((r) => r.highlighted);
+    const defaultRemark =
+      highlightedRemarks.length > 0
+        ? highlightedRemarks[highlightedRemarks.length - 1].text
+        : remarksList.length > 0
+        ? remarksList[remarksList.length - 1].text
+        : "";
 
     sheet.addRow(
       sanitizeRowValues({
@@ -233,7 +251,7 @@ export async function exportProjects(req: Request, res: Response) {
         priority: row.priority,
         deadlineDate: row.deadline_date,
         status: row.status,
-        remarks: remarksList.length > 0 ? remarksList[remarksList.length - 1] : "",
+        remarks: defaultRemark,
       })
     );
 
@@ -243,16 +261,24 @@ export async function exportProjects(req: Request, res: Response) {
     if (remarksList.length > 0) {
       const lookupRow = remarksLookupSheet.getRow(lookupRowNum);
       remarksList.forEach((remark, col) => {
-        lookupRow.getCell(col + 1).value = sanitizeForExcel(remark) as string;
+        lookupRow.getCell(col + 1).value = sanitizeForExcel(remark.text) as string;
       });
       lookupRow.commit();
 
       const lastCol = String.fromCharCode("A".charCodeAt(0) + remarksList.length - 1);
-      sheet.getCell(`${remarksColLetter}${dataRowNum}`).dataValidation = {
+      const remarksCell = sheet.getCell(`${remarksColLetter}${dataRowNum}`);
+      remarksCell.dataValidation = {
         type: "list",
         allowBlank: true,
         formulae: [`RemarksLookup!$A$${lookupRowNum}:$${lastCol}$${lookupRowNum}`],
       };
+      if (highlightedRemarks.length > 0) {
+        remarksCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFFFA500" },
+        };
+      }
     }
 
     if (components.length > 0) {

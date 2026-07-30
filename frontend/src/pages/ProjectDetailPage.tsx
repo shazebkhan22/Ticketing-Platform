@@ -4,7 +4,14 @@ import { format, parse, isValid } from "date-fns";
 import { toast } from "sonner";
 import { projectRemarkSchema as remarkSchema } from "@/lib/schemas";
 import { useAuth } from "@/hooks/useAuth";
-import { useAddProjectRemark, useProjectDetail, useUpdateProjectStatus } from "@/hooks/useProjects";
+import {
+  useAddProjectRemark,
+  useProjectDetail,
+  useUpdateProjectRemarkHighlight,
+  useUpdateProjectStatus,
+} from "@/hooks/useProjects";
+import { StarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { TicketStatus } from "@/types/ticket";
 import { STATUS_FLOW } from "@/constants/ticket";
 import { ProjectStatusBadge } from "@/components/ProjectStatusBadge";
@@ -48,6 +55,7 @@ export function ProjectDetailPage() {
   const { data, isLoading } = useProjectDetail(projectSrNo);
   const updateStatus = useUpdateProjectStatus(projectSrNo);
   const addRemarkMutation = useAddProjectRemark(projectSrNo);
+  const highlightRemarkMutation = useUpdateProjectRemarkHighlight(projectSrNo);
 
   const [newRemark, setNewRemark] = useState("");
   const [remarkError, setRemarkError] = useState<string | null>(null);
@@ -326,12 +334,34 @@ export function ProjectDetailPage() {
             {remarks.map((r) => (
               <div
                 key={r.id}
-                className="rounded-r-md border-l-3 border-cygnus-600 bg-neutral-50 px-3.5 py-2"
+                className={cn(
+                  "rounded-r-md border-l-3 px-3.5 py-2",
+                  r.highlighted ? "border-orange-500 bg-orange-50" : "border-cygnus-600 bg-neutral-50"
+                )}
               >
-                <div className="mb-1 text-xs text-neutral-500">
-                  {formatDateTimeWithSeconds(r.createdAt)} {r.createdBy && `· ${r.createdBy}`}
+                <div className="mb-1 flex items-center justify-between gap-2 capitalize">
+                  <div className="text-xs text-neutral-500">
+                    {formatDateTimeWithSeconds(r.createdAt)} {r.createdBy && `· ${r.createdBy}`}
+                  </div>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      className="no-print shrink-0 text-neutral-400 hover:text-orange-500"
+                      disabled={highlightRemarkMutation.isPending}
+                      title={r.highlighted ? "Remove highlight" : "Highlight this remark"}
+                      onClick={() =>
+                        highlightRemarkMutation.mutate({ remarkId: r.id, highlighted: !r.highlighted })
+                      }
+                    >
+                      <StarIcon
+                        className={cn("h-4 w-4", r.highlighted && "fill-orange-500 text-orange-500")}
+                      />
+                    </button>
+                  )}
                 </div>
-                <div className="text-sm text-neutral-800">{r.body}</div>
+                <div className={cn("text-sm text-neutral-800", r.highlighted && "font-bold")}>
+                  {r.body}
+                </div>
               </div>
             ))}
           </div>
