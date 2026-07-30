@@ -5,6 +5,7 @@ import { generateTicketNumber } from "../utils/ticketNumber";
 import { logActivity } from "../utils/activityLog";
 import { getOrCreateCustomerId } from "../utils/customers";
 import { resolveAccountManagerName } from "../utils/accountManagers";
+import { broadcastEvent } from "../utils/sse";
 import {
   TICKET_MODES,
   CALL_TYPES,
@@ -377,6 +378,17 @@ export async function createTicket(req: Request, res: Response) {
      ${ASSIGNEES_LATERAL_JOIN}
      WHERE t.sr_no = $1`,
     [ticket.sr_no]
+  );
+
+  broadcastEvent(
+    "ticket:created",
+    {
+      srNo: ticket.sr_no,
+      ticketNo: ticket.ticket_no,
+      companyName: ticket.company_name,
+      createdBy: req.session.username ?? "Unknown",
+    },
+    req.session.userId
   );
 
   res.status(201).json(rowToTicket(created.rows[0]));

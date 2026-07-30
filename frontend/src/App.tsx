@@ -5,6 +5,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { SidebarLayout } from "@/components/SidebarLayout";
+import { RealtimeNotifications } from "@/components/RealtimeNotifications";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
@@ -87,6 +88,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <RealtimeNotifications />
         <TooltipProvider>
           <Suspense fallback={<PageFallback />}>
             <Routes>

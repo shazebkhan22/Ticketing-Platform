@@ -6,6 +6,7 @@ import { computeDeadline } from "../utils/projectDeadline";
 import { logActivity } from "../utils/activityLog";
 import { getOrCreateCustomerId } from "../utils/customers";
 import { resolveAccountManagerName } from "../utils/accountManagers";
+import { broadcastEvent } from "../utils/sse";
 import { TICKET_STATUSES, TICKET_PRIORITIES } from "../types/ticket";
 import { PROJECT_TIME_UNITS } from "../types/project";
 
@@ -382,6 +383,17 @@ export async function createProject(req: Request, res: Response) {
      ${ASSIGNEES_LATERAL_JOIN}
      WHERE p.sr_no = $1`,
     [project.sr_no]
+  );
+
+  broadcastEvent(
+    "project:created",
+    {
+      srNo: project.sr_no,
+      projectNo: project.project_no,
+      companyName: project.company_name,
+      createdBy: req.session.username ?? "Unknown",
+    },
+    req.session.userId
   );
 
   res.status(201).json(rowToProject(created.rows[0]));
