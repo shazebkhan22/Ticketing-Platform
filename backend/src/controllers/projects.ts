@@ -139,6 +139,7 @@ export async function listProjects(req: Request, res: Response) {
     assignedBy,
     accountManager,
     priority,
+    team,
     dateFrom,
     dateTo,
     search,
@@ -165,6 +166,12 @@ export async function listProjects(req: Request, res: Response) {
     params.push(parseInt(effectiveAssigneeUserId, 10));
     conditions.push(
       `EXISTS (SELECT 1 FROM project_assignees pa WHERE pa.project_sr_no = p.sr_no AND pa.user_id = $${params.length})`
+    );
+  }
+  if (team) {
+    params.push(team);
+    conditions.push(
+      `EXISTS (SELECT 1 FROM project_assignees pa JOIN users u ON u.id = pa.user_id WHERE pa.project_sr_no = p.sr_no AND u.team = $${params.length})`
     );
   }
   if (accountManager) {

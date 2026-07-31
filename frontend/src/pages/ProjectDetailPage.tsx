@@ -193,6 +193,33 @@ export function ProjectDetailPage() {
         </DialogContent>
       </Dialog>
 
+            {remarks.some((r) => r.highlighted) && (
+        <Card className="mb-6 border-orange-300">
+          <CardContent>
+            <h3 className="mb-3 flex items-center gap-1.5 text-xl font-bold text-red-600">
+              <StarIcon className="h-4 w-4 fill-red-500 text-red-500" />
+            Roadblocks
+            </h3>
+            <div className="flex flex-col gap-1">
+              {remarks
+                .filter((r) => r.highlighted)
+                .reverse()
+                .map((r) => (
+                  <div
+                    key={r.id}
+                    className="rounded-r-md border-l-3 border-red-500 bg-red-50 px-3.5 py-2"
+                  >
+                    <div className="mb-1 text-xs text-neutral-500 capitalize">
+                      {formatDateTimeWithSeconds(r.createdAt)} {r.createdBy && `· ${r.createdBy}`}
+                    </div>
+                    <div className="text-sm font-bold text-neutral-800">{r.body}</div>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="print:hidden">
       <div className="no-print mb-6 flex items-center justify-between">
         <div>

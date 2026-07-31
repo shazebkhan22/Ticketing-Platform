@@ -76,6 +76,7 @@ export interface ProjectFilters {
   assignedBy?: string;
   accountManager?: string;
   priority?: string;
+  team?: string;
   dateFrom?: string;
   dateTo?: string;
   search?: string;

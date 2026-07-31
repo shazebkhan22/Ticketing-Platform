@@ -1,4 +1,5 @@
 export type UserRole = "admin" | "employee";
+export type UserTeam = "FMS" | "Field";
 
 export interface AppUser {
   id: number;
@@ -8,6 +9,7 @@ export interface AppUser {
   email: string | null;
   createdAt: string;
   isActive: boolean;
+  team: UserTeam | null;
 }
 
 export interface CreateUserInput {
@@ -16,6 +18,7 @@ export interface CreateUserInput {
   role: UserRole;
   displayName: string;
   email?: string;
+  team?: UserTeam;
 }
 
 export interface AccountManager {

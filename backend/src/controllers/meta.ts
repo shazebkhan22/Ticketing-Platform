@@ -6,6 +6,7 @@ import {
   TICKET_STATUSES,
   INTERNAL_TAGS,
   TICKET_PRIORITIES,
+  USER_TEAMS,
 } from "../types/ticket";
 import { PROJECT_TIME_UNITS } from "../types/project";
 
@@ -59,6 +60,7 @@ export async function getOptions(_req: Request, res: Response) {
     internalTags: INTERNAL_TAGS,
     priorities: TICKET_PRIORITIES,
     projectTimeUnits: PROJECT_TIME_UNITS,
+    teams: USER_TEAMS,
     accountManagers: accountManagersResult.rows.map((r) => r.account_manager),
     assignedBys: assignedByResult.rows.map((r) => r.assigned_by),
     companyNames: customersResult.rows.map((r) => r.name),

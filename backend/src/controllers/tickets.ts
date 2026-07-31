@@ -120,6 +120,7 @@ export async function listTickets(req: Request, res: Response) {
     assignedBy,
     accountManager,
     priority,
+    team,
     dateFrom,
     dateTo,
     search,
@@ -143,6 +144,12 @@ export async function listTickets(req: Request, res: Response) {
     params.push(parseInt(assigneeUserId, 10));
     conditions.push(
       `EXISTS (SELECT 1 FROM ticket_assignees ta WHERE ta.ticket_sr_no = t.sr_no AND ta.user_id = $${params.length})`
+    );
+  }
+  if (team) {
+    params.push(team);
+    conditions.push(
+      `EXISTS (SELECT 1 FROM ticket_assignees ta JOIN users u ON u.id = ta.user_id WHERE ta.ticket_sr_no = t.sr_no AND u.team = $${params.length})`
     );
   }
   if (accountManager) {

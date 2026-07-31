@@ -1,4 +1,5 @@
 import type { ProjectTimeUnit } from "@/types/project";
+import type { UserTeam } from "@/types/user";
 
 export type TicketMode = "Whatsapp" | "Call" | "Mail" | "Verbally";
 export type CallType =
@@ -155,6 +156,7 @@ export interface MetaOptions {
   customers: CustomerDirectoryEntry[];
   assignedToOptions: Employee[];
   accountManagerDirectory: AccountManagerDirectoryEntry[];
+  teams: UserTeam[];
 }
 
 export interface TicketListResponse {
@@ -171,6 +173,7 @@ export interface TicketFilters {
   assignedBy?: string;
   accountManager?: string;
   priority?: string;
+  team?: string;
   dateFrom?: string;
   dateTo?: string;
   search?: string;

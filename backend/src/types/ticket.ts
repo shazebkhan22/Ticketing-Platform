@@ -16,6 +16,7 @@ export const INTERNAL_TAGS = ["Internal", "External"] as const;
 // P1 = highest priority, P4 = lowest.
 export const TICKET_PRIORITIES = ["P1", "P2", "P3", "P4"] as const;
 export const REPAIR_LOCATIONS = ["In-House", "Outsourced"] as const;
+export const USER_TEAMS = ["FMS", "Field"] as const;
 
 // "Account Manager" is free text (anybody in the office who reported the
 // issue), not a preset list — see controllers/tickets.ts.

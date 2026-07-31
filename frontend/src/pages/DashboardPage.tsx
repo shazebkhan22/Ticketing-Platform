@@ -15,6 +15,9 @@ import {
   SUMMARY_CARDS,
   ALL_FILTER_VALUE,
   DEFAULT_TICKET_FILTERS,
+  EXPORT_RANGE_OPTIONS,
+  exportRangeToDateFrom,
+  type ExportRange,
 } from "@/constants/dashboard";
 import { PRIORITY_CLASSES, PRIORITY_LABELS } from "@/constants/ticket";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -99,12 +102,17 @@ export function DashboardPage() {
   const templateMutation = useDownloadImportTemplate();
   const importInputRef = useRef<HTMLInputElement>(null);
   const [exportConfirmOpen, setExportConfirmOpen] = useState(false);
+  const [exportRange, setExportRange] = useState<ExportRange>("30");
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
 
   async function handleExport() {
     setExportConfirmOpen(false);
     try {
-      await exportMutation.mutateAsync(effectiveFilters);
+      await exportMutation.mutateAsync({
+        ...effectiveFilters,
+        dateFrom: exportRangeToDateFrom(exportRange),
+        dateTo: undefined,
+      });
     } catch {
       toast.error("Failed to export tickets");
     }
@@ -159,7 +167,7 @@ export function DashboardPage() {
   }
 
   function updateSelectFilter(
-    key: "status" | "callType" | "accountManager" | "assignedBy" | "priority",
+    key: "status" | "callType" | "accountManager" | "assignedBy" | "priority" | "team",
   ) {
     return (value: string) =>
       updateFilter(key, value === ALL_FILTER_VALUE ? undefined : value);
@@ -242,6 +250,21 @@ export function DashboardPage() {
               current filters (not just the current page).
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="mb-2">
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">Date Range</label>
+            <Select value={exportRange} onValueChange={(v) => setExportRange(v as ExportRange)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EXPORT_RANGE_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleExport}>Export</AlertDialogAction>
@@ -431,6 +454,27 @@ export function DashboardPage() {
                 {options?.assignedBys.map((a) => (
                   <SelectItem key={a} value={a}>
                     {a}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-20 flex-1">
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">
+              Team
+            </label>
+            <Select
+              value={filters.team ?? ALL_FILTER_VALUE}
+              onValueChange={updateSelectFilter("team")}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_FILTER_VALUE}>All</SelectItem>
+                {options?.teams.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
                   </SelectItem>
                 ))}
               </SelectContent>

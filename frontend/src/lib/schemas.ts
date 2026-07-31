@@ -129,6 +129,7 @@ export const createUserSchema = z.object({
   role: z.enum(["admin", "employee"]),
   displayName: z.string().min(1, "Required").max(100),
   email: z.string().email({ message: "Invalid email" }).optional().or(z.literal("")),
+  team: z.enum(["FMS", "Field"]).optional(),
 });
 export type CreateUserValues = z.infer<typeof createUserSchema>;
 

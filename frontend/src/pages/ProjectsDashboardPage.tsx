@@ -11,7 +11,14 @@ import {
   useProjectSummary,
 } from "@/hooks/useProjects";
 import type { ProjectFilters } from "@/types/project";
-import { SUMMARY_CARDS, ALL_FILTER_VALUE, DEFAULT_PROJECT_FILTERS } from "@/constants/dashboard";
+import {
+  PROJECT_SUMMARY_CARDS,
+  ALL_FILTER_VALUE,
+  DEFAULT_PROJECT_FILTERS,
+  EXPORT_RANGE_OPTIONS,
+  exportRangeToDateFrom,
+  type ExportRange,
+} from "@/constants/dashboard";
 import { PRIORITY_CLASSES, PRIORITY_LABELS } from "@/constants/ticket";
 import { ProjectStatusBadge } from "@/components/ProjectStatusBadge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -81,12 +88,17 @@ export function ProjectsDashboardPage() {
   const templateMutation = useDownloadProjectImportTemplate();
   const importInputRef = useRef<HTMLInputElement>(null);
   const [exportConfirmOpen, setExportConfirmOpen] = useState(false);
+  const [exportRange, setExportRange] = useState<ExportRange>("30");
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
 
   async function handleExport() {
     setExportConfirmOpen(false);
     try {
-      await exportMutation.mutateAsync(effectiveFilters);
+      await exportMutation.mutateAsync({
+        ...effectiveFilters,
+        dateFrom: exportRangeToDateFrom(exportRange),
+        dateTo: undefined,
+      });
     } catch {
       toast.error("Failed to export projects");
     }
@@ -137,7 +149,7 @@ export function ProjectsDashboardPage() {
     }));
   }
 
-  function updateSelectFilter(key: "status" | "accountManager" | "assignedBy" | "priority") {
+  function updateSelectFilter(key: "status" | "accountManager" | "assignedBy" | "priority" | "team") {
     return (value: string) => updateFilter(key, value === ALL_FILTER_VALUE ? undefined : value);
   }
 
@@ -199,6 +211,21 @@ export function ProjectsDashboardPage() {
               current filters (not just the current page).
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="mb-2">
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">Date Range</label>
+            <Select value={exportRange} onValueChange={(v) => setExportRange(v as ExportRange)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EXPORT_RANGE_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleExport}>Export</AlertDialogAction>
@@ -233,7 +260,7 @@ export function ProjectsDashboardPage() {
       </AlertDialog>
 
       <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-5">
-        {SUMMARY_CARDS.map((card) => (
+        {PROJECT_SUMMARY_CARDS.map((card) => (
           <Card key={card.key} className={cn(card.color)}>
             <CardContent>
               <div className="mb-1 text-sm font-semibold tracking-wide uppercase opacity-80">
@@ -329,6 +356,22 @@ export function ProjectsDashboardPage() {
               </Select>
             </div>
           )}
+          <div className="min-w-20 flex-1">
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">Team</label>
+            <Select value={filters.team ?? ALL_FILTER_VALUE} onValueChange={updateSelectFilter("team")}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_FILTER_VALUE}>All</SelectItem>
+                {options?.teams.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="min-w-32 flex-1">
             <label className="mb-1 block text-xs font-semibold text-neutral-500">From</label>
             <DatePicker

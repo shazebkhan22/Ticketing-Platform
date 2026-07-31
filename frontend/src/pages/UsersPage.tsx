@@ -52,6 +52,20 @@ export function UsersPage() {
   const [entryType, setEntryType] = useState<"employee" | "accountManager">("employee");
   const [editingAccountManager, setEditingAccountManager] = useState<AccountManager | null>(null);
 
+  const PAGE_SIZE = 7;
+  const [employeesPage, setEmployeesPage] = useState(1);
+  const [accountManagersPage, setAccountManagersPage] = useState(1);
+
+  const employeesTotalPages = Math.max(Math.ceil((users?.length ?? 0) / PAGE_SIZE), 1);
+  const paginatedUsers = users?.slice((employeesPage - 1) * PAGE_SIZE, employeesPage * PAGE_SIZE);
+
+  const accountManagersTotalPages = Math.max(Math.ceil((accountManagers?.length ?? 0) / PAGE_SIZE), 1);
+  const paginatedAccountManagers = accountManagers?.slice(
+    (accountManagersPage - 1) * PAGE_SIZE,
+    accountManagersPage * PAGE_SIZE
+  );
+
+
   async function handleToggleActive(id: number, isActive: boolean) {
     try {
       await setActiveMutation.mutateAsync({ id, isActive: !isActive });
@@ -72,6 +86,7 @@ export function UsersPage() {
       role: "employee",
       displayName: "",
       email: "",
+      team: undefined,
     },
   });
 
@@ -306,6 +321,32 @@ export function UsersPage() {
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name="team"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Team</FormLabel>
+                      <Select
+                        value={field.value ?? "__none__"}
+                        onValueChange={(v) => field.onChange(v === "__none__" ? undefined : v)}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          <SelectItem value="FMS">FMS</SelectItem>
+                          <SelectItem value="Field">Field</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <Button type="submit" disabled={createMutation.isPending} className="w-full">
                   {createMutation.isPending ? "Adding..." : "Add Employee"}
                 </Button>
@@ -332,17 +373,19 @@ export function UsersPage() {
                 <th className="pb-2 font-medium">Username</th>
                 <th className="pb-2 font-medium">Email</th>
                 <th className="pb-2 font-medium">Role</th>
+                <th className="pb-2 font-medium">Team</th>
                 <th className="pb-2 font-medium">Status</th>
                 <th className="pb-2 font-medium"></th>
               </tr>
             </thead>
             <tbody>
-              {users?.map((u) => (
+              {paginatedUsers?.map((u) => (
                 <tr key={u.id} className="border-b border-neutral-100 last:border-0">
                   <td className="py-2 text-neutral-800">{u.displayName}</td>
                   <td className="py-2 text-neutral-600">{u.username}</td>
                   <td className="py-2 text-neutral-600">{u.email || "—"}</td>
                   <td className="py-2 capitalize text-neutral-600">{u.role}</td>
+                  <td className="py-2 text-neutral-600">{u.team ?? "—"}</td>
                   <td className="py-2">
                     <Badge variant={u.isActive ? "secondary" : "destructive"}>
                       {u.isActive ? "Active" : "Deactivated"}
@@ -364,6 +407,34 @@ export function UsersPage() {
               ))}
             </tbody>
           </table>
+        )}
+        {!isLoading && (users?.length ?? 0) > PAGE_SIZE && (
+          <div className="mt-4 flex items-center justify-between text-sm text-neutral-500">
+            <span>
+              Showing {paginatedUsers?.length ?? 0} of {users?.length ?? 0} employees
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={employeesPage <= 1}
+                onClick={() => setEmployeesPage((p) => p - 1)}
+              >
+                Prev
+              </Button>
+              <span>
+                Page {employeesPage} of {employeesTotalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={employeesPage >= employeesTotalPages}
+                onClick={() => setEmployeesPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -391,7 +462,7 @@ export function UsersPage() {
                   </td>
                 </tr>
               )}
-              {accountManagers?.map((am) => (
+              {paginatedAccountManagers?.map((am) => (
                 <tr key={am.id} className="border-b border-neutral-100 last:border-0">
                   <td className="py-2 text-neutral-800">{am.name}</td>
                   <td className="py-2 text-neutral-600">{am.email}</td>
@@ -405,6 +476,34 @@ export function UsersPage() {
               ))}
             </tbody>
           </table>
+        )}
+        {!accountManagersLoading && (accountManagers?.length ?? 0) > PAGE_SIZE && (
+          <div className="mt-4 flex items-center justify-between text-sm text-neutral-500">
+            <span>
+              Showing {paginatedAccountManagers?.length ?? 0} of {accountManagers?.length ?? 0} account managers
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={accountManagersPage <= 1}
+                onClick={() => setAccountManagersPage((p) => p - 1)}
+              >
+                Prev
+              </Button>
+              <span>
+                Page {accountManagersPage} of {accountManagersTotalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={accountManagersPage >= accountManagersTotalPages}
+                onClick={() => setAccountManagersPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 
