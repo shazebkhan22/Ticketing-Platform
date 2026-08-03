@@ -194,7 +194,7 @@ export function ProjectDetailPage() {
       </Dialog>
 
             {remarks.some((r) => r.highlighted) && (
-        <Card className="mb-6 border-orange-300">
+        <Card className="mb-6 border-orange-300 print:hidden">
           <CardContent>
             <h3 className="mb-3 flex items-center gap-1.5 text-xl font-bold text-red-600">
               <StarIcon className="h-4 w-4 fill-red-500 text-red-500" />
