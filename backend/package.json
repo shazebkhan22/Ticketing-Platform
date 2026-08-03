@@ -13,6 +13,7 @@
     "migrate:down": "node-pg-migrate down",
     "migrate:create": "node-pg-migrate create -j sql",
     "preview-email": "tsx src/dev/previewEmail.ts",
+    "send-password-emails": "tsx src/dev/sendPasswordEmails.ts",
     "test": "vitest run",
     "test:e2e": "vitest run -c vitest.e2e.config.ts"
   },
