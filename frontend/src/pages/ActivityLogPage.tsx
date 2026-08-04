@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
 import { useActivity } from "@/hooks/useActivity";
-import { usePaginatedFilters, getTotalPages } from "@/hooks/usePaginatedFilters";
+import {
+  usePaginatedFilters,
+  getTotalPages,
+} from "@/hooks/usePaginatedFilters";
 import { formatDateTime } from "@/lib/ticket-utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { PaginationFooter } from "@/components/PaginationFooter";
@@ -15,22 +18,25 @@ import {
 } from "@/components/ui/table";
 import type { ActivityFilters } from "@/types/activity";
 
-const DEFAULT_FILTERS: ActivityFilters = { page: 1, pageSize: 10 };
+const DEFAULT_FILTERS: ActivityFilters = { page: 1, pageSize: 12 };
 
 export function ActivityLogPage() {
-  const { filters, updateFilter, page, pageSize } = usePaginatedFilters(DEFAULT_FILTERS);
+  const { filters, updateFilter, page, pageSize } =
+    usePaginatedFilters(DEFAULT_FILTERS);
   const { data, isLoading } = useActivity(filters);
 
   const entries = data?.entries ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
 
+  console.log(entries);
+
   return (
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-neutral-800">Activity Log</h2>
         <p className="text-sm text-neutral-500">
-        A complete timeline of all actions performed within the system.
+          A complete timeline of all actions performed within the system.
         </p>
       </div>
 
@@ -39,10 +45,10 @@ export function ActivityLogPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Time</TableHead>
-                <TableHead>Person</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Ticket</TableHead>
+                <TableHead className="w-48">Time</TableHead>
+                <TableHead className="w-32">Person</TableHead>
+                <TableHead className="w-32">Ticket</TableHead>
+                <TableHead className="w-60">Action</TableHead>
                 <TableHead>Details</TableHead>
               </TableRow>
             </TableHeader>
@@ -50,16 +56,20 @@ export function ActivityLogPage() {
               {isLoading ? (
                 <TableSkeletonRows colSpan={5} rows={8} />
               ) : entries.length === 0 ? (
-                <TableEmptyRow colSpan={5} message="No activity recorded yet." />
+                <TableEmptyRow
+                  colSpan={5}
+                  message="No activity recorded yet."
+                />
               ) : (
                 entries.map((entry) => (
                   <TableRow key={entry.id}>
-                    <TableCell className="whitespace-nowrap text-sm text-neutral-500">
+                    <TableCell className="py-2 whitespace-nowrap text-sm text-neutral-500">
                       {formatDateTime(entry.createdAt)}
                     </TableCell>
-                    <TableCell className="text-sm font-medium capitalize">{entry.actorName}</TableCell>
-                    <TableCell className="text-sm">{entry.action}</TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell className="py-2 text-sm font-medium capitalize">
+                      {entry.actorName}
+                    </TableCell>
+                    <TableCell className="py-2 text-sm">
                       {entry.ticketSrNo ? (
                         <Link
                           to={`/tickets/${entry.ticketSrNo}`}
@@ -68,10 +78,13 @@ export function ActivityLogPage() {
                           {entry.ticketNo}
                         </Link>
                       ) : (
-                        entry.ticketNo ?? "—"
+                        (entry.ticketNo ?? "—")
                       )}
                     </TableCell>
-                    <TableCell className="max-w-md truncate text-sm text-neutral-500">
+                    <TableCell className="py-2 text-sm">
+                      {entry.action}
+                    </TableCell>
+                    <TableCell className="py-2 max-w-md truncate text-sm text-neutral-500">
                       {entry.details ?? "—"}
                     </TableCell>
                   </TableRow>

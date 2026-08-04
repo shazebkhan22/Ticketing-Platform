@@ -1,4 +1,11 @@
+import { parse, isValid } from "date-fns";
 import type { Ticket } from "@/types/ticket";
+
+export function parseIsoDate(value?: string | null): Date | undefined {
+  if (!value) return undefined;
+  const parsed = parse(value.slice(0, 10), "yyyy-MM-dd", new Date());
+  return isValid(parsed) ? parsed : undefined;
+}
 
 export function isOverdue(ticket: Ticket): boolean {
   if (ticket.status === "Closed") return false;

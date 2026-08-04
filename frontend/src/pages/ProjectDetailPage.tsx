@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { format, parse, isValid } from "date-fns";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { projectRemarkSchema as remarkSchema } from "@/lib/schemas";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,7 +16,12 @@ import type { TicketStatus } from "@/types/ticket";
 import { STATUS_FLOW } from "@/constants/ticket";
 import { ProjectStatusBadge } from "@/components/ProjectStatusBadge";
 import { InstallationReport } from "@/components/InstallationReport";
-import { formatDate, formatDateTime, formatDateTimeWithSeconds } from "@/lib/ticket-utils";
+import {
+  formatDate,
+  formatDateTime,
+  formatDateTimeWithSeconds,
+  parseIsoDate,
+} from "@/lib/ticket-utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,12 +35,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-function parseIsoDate(value?: string | null): Date | undefined {
-  if (!value) return undefined;
-  const parsed = parse(value.slice(0, 10), "yyyy-MM-dd", new Date());
-  return isValid(parsed) ? parsed : undefined;
-}
 
 function Field({ label, value }: { label: string; value?: string | null }) {
   return (
