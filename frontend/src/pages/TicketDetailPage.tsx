@@ -422,7 +422,7 @@ export function TicketDetailPage() {
           </div>
 
           <div className="space-y-6 lg:sticky lg:top-4">
-            <SectionCard icon={Clock} title="SLA & Status">
+            <SectionCard icon={Clock} title="Status">
               <div className="grid grid-cols-1 gap-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">

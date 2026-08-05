@@ -423,7 +423,7 @@ export function ProjectFormPage() {
                       <FormItem>
                         <FormLabel>Serial Number(s)</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Comma-separated if multiple" />
+                          <Input {...field} placeholder="Comma-separated if multiple eg: 5CD6108XFV, 5CD6107CQM" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

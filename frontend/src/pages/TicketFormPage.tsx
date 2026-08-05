@@ -392,7 +392,7 @@ export function TicketFormPage() {
                   </FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Comma-separated if multiple"
+                      placeholder="Comma-separated if multiple eg: 5CD6108XFV, 5CD6107CQM, 5CD6107WJB"
                       {...field}
                     />
                   </FormControl>
