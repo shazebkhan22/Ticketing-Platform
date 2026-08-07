@@ -11,6 +11,7 @@ import {
   useProjectSummary,
 } from "@/hooks/useProjects";
 import type { ProjectFilters } from "@/types/project";
+import { usePaginatedFilters, getTotalPages } from "@/hooks/usePaginatedFilters";
 import {
   PROJECT_SUMMARY_CARDS,
   ALL_FILTER_VALUE,
@@ -45,6 +46,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PaginationFooter } from "@/components/PaginationFooter";
+import { TableSkeletonRows, TableEmptyRow } from "@/components/TableListStates";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,7 +63,8 @@ export function ProjectsDashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
-  const [filters, setFilters] = useState<ProjectFilters>(DEFAULT_PROJECT_FILTERS);
+  const { filters, updateFilter, resetFilters, page, pageSize } =
+    usePaginatedFilters(DEFAULT_PROJECT_FILTERS);
 
   const isOverdueView = searchParams.get("overdue") === "true";
   const isMineView = searchParams.get("mine") === "true";
@@ -129,11 +133,11 @@ export function ProjectsDashboardPage() {
         toast.success(`Imported ${result.created} project(s)`);
       } else if (result.created === 0) {
         toast.error(
-          `Import failed for all ${result.failedCount} row(s). First error: ${result.errors[0]?.error}`,
+          `Import failed for all ${result.failedCount} row(s). First error: ${result.errors[0]?.error}`
         );
       } else {
         toast.warning(
-          `Imported ${result.created} project(s), ${result.failedCount} row(s) failed. First error (row ${result.errors[0]?.row}): ${result.errors[0]?.error}`,
+          `Imported ${result.created} project(s), ${result.failedCount} row(s) failed. First error (row ${result.errors[0]?.row}): ${result.errors[0]?.error}`
         );
       }
     } catch {
@@ -141,15 +145,9 @@ export function ProjectsDashboardPage() {
     }
   }
 
-  function updateFilter<K extends keyof ProjectFilters>(key: K, value: ProjectFilters[K]) {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-      page: key === "page" ? (value as number) : 1,
-    }));
-  }
-
-  function updateSelectFilter(key: "status" | "accountManager" | "assignedBy" | "priority" | "team") {
+  function updateSelectFilter(
+    key: "status" | "accountManager" | "assignedBy" | "priority" | "team"
+  ) {
     return (value: string) => updateFilter(key, value === ALL_FILTER_VALUE ? undefined : value);
   }
 
@@ -157,9 +155,7 @@ export function ProjectsDashboardPage() {
     updateFilter("assigneeUserId", value === ALL_FILTER_VALUE ? undefined : Number(value));
   }
 
-  const pageSize = filters.pageSize ?? 7;
-  const page = filters.page ?? 1;
-  const totalPages = Math.max(Math.ceil(total / pageSize), 1);
+  const totalPages = getTotalPages(total, pageSize);
 
   return (
     <div>
@@ -207,8 +203,7 @@ export function ProjectsDashboardPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Export projects to Excel?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will download an .xlsx file of every project matching your
-              current filters.
+              This will download an .xlsx file of every project matching your current filters.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="mb-2">
@@ -241,20 +236,16 @@ export function ProjectsDashboardPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Import projects from "{pendingImportFile?.name}" ?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Import projects from "{pendingImportFile?.name}" ?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will create a new project for every valid row in the file.
-              Rows that fail validation will be skipped and reported — this
-              cannot be undone in bulk, so make sure this is the right file.
+              This will create a new project for every valid row in the file. Rows that fail
+              validation will be skipped and reported — this cannot be undone in bulk, so make sure
+              this is the right file.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmImport}>
-              Import
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleConfirmImport}>Import</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -286,7 +277,10 @@ export function ProjectsDashboardPage() {
           </div>
           <div className="min-w-14 flex-1">
             <label className="mb-1 block text-xs font-semibold text-neutral-500">Status</label>
-            <Select value={filters.status ?? ALL_FILTER_VALUE} onValueChange={updateSelectFilter("status")}>
+            <Select
+              value={filters.status ?? ALL_FILTER_VALUE}
+              onValueChange={updateSelectFilter("status")}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -302,7 +296,10 @@ export function ProjectsDashboardPage() {
           </div>
           <div className="min-w-20 flex-1">
             <label className="mb-1 block text-xs font-semibold text-neutral-500">Priority</label>
-            <Select value={filters.priority ?? ALL_FILTER_VALUE} onValueChange={updateSelectFilter("priority")}>
+            <Select
+              value={filters.priority ?? ALL_FILTER_VALUE}
+              onValueChange={updateSelectFilter("priority")}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -317,7 +314,9 @@ export function ProjectsDashboardPage() {
             </Select>
           </div>
           <div className="min-w-28 flex-1">
-            <label className="mb-1 block text-xs font-semibold text-neutral-500">Account Manager</label>
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">
+              Account Manager
+            </label>
             <Select
               value={filters.accountManager ?? ALL_FILTER_VALUE}
               onValueChange={updateSelectFilter("accountManager")}
@@ -337,7 +336,9 @@ export function ProjectsDashboardPage() {
           </div>
           {isAdmin && (
             <div className="min-w-20 flex-1">
-              <label className="mb-1 block text-xs font-semibold text-neutral-500">Assigned To</label>
+              <label className="mb-1 block text-xs font-semibold text-neutral-500">
+                Assigned To
+              </label>
               <Select
                 value={filters.assigneeUserId ? String(filters.assigneeUserId) : ALL_FILTER_VALUE}
                 onValueChange={updateAssigneeFilter}
@@ -358,7 +359,10 @@ export function ProjectsDashboardPage() {
           )}
           <div className="min-w-20 flex-1">
             <label className="mb-1 block text-xs font-semibold text-neutral-500">Team</label>
-            <Select value={filters.team ?? ALL_FILTER_VALUE} onValueChange={updateSelectFilter("team")}>
+            <Select
+              value={filters.team ?? ALL_FILTER_VALUE}
+              onValueChange={updateSelectFilter("team")}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -385,7 +389,7 @@ export function ProjectsDashboardPage() {
               variant="default"
               size="lg"
               onClick={() => {
-                setFilters(DEFAULT_PROJECT_FILTERS);
+                resetFilters();
                 if (isOverdueView || isMineView) {
                   navigate("/projects", { replace: true });
                 }
@@ -413,20 +417,11 @@ export function ProjectsDashboardPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && (
-              <TableRow>
-                <TableCell colSpan={9} className="py-6 text-center text-neutral-400">
-                  Loading...
-                </TableCell>
-              </TableRow>
-            )}
-            {!isLoading && projects.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={9} className="py-6 text-center text-neutral-400">
-                  No projects found.
-                </TableCell>
-              </TableRow>
-            )}
+            {isLoading ? (
+              <TableSkeletonRows colSpan={9} />
+            ) : projects.length === 0 ? (
+              <TableEmptyRow colSpan={9} message="No projects found." />
+            ) : null}
             {projects.map((p) => (
               <TableRow
                 key={p.srNo}
@@ -446,7 +441,10 @@ export function ProjectsDashboardPage() {
                 <TableCell>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Badge variant="secondary" className={cn("rounded-full", PRIORITY_CLASSES[p.priority])}>
+                      <Badge
+                        variant="secondary"
+                        className={cn("rounded-full", PRIORITY_CLASSES[p.priority])}
+                      >
                         {p.priority}
                       </Badge>
                     </TooltipTrigger>
@@ -463,31 +461,16 @@ export function ProjectsDashboardPage() {
         </Table>
       </Card>
 
-      <div className="mt-4 flex items-center justify-between text-sm text-neutral-500">
-        <span>
-          Showing {projects.length} of {total} projects
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => updateFilter("page", page - 1)}
-          >
-            Prev
-          </Button>
-          <span>
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => updateFilter("page", page + 1)}
-          >
-            Next
-          </Button>
-        </div>
+      <div className="mt-4">
+        <PaginationFooter
+          currentCount={projects.length}
+          total={total}
+          itemLabel="projects"
+          page={page}
+          totalPages={totalPages}
+          onPrev={() => updateFilter("page", Math.max(page - 1, 1))}
+          onNext={() => updateFilter("page", Math.min(page + 1, totalPages))}
+        />
       </div>
     </div>
   );

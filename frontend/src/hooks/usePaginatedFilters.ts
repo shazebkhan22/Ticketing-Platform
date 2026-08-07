@@ -17,10 +17,14 @@ export function usePaginatedFilters<T extends { page?: number; pageSize?: number
     }));
   }
 
+  function resetFilters() {
+    setFilters(defaultFilters);
+  }
+
   const page = filters.page ?? 1;
   const pageSize = filters.pageSize ?? defaultFilters.pageSize ?? 10;
 
-  return { filters, updateFilter, page, pageSize };
+  return { filters, updateFilter, resetFilters, page, pageSize };
 }
 
 export function getTotalPages(total: number, pageSize: number): number {

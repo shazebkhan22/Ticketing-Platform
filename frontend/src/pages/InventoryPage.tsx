@@ -5,11 +5,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useInventoryList, useUpdateInventory } from "@/hooks/useInventory";
 import { useUpdateTicketStatusForAnyTicket } from "@/hooks/useTickets";
 import { usePaginatedFilters, getTotalPages } from "@/hooks/usePaginatedFilters";
-import type {
-  InventoryItem,
-  RepairLocation,
-  EditFormState,
-} from "@/types/inventory";
+import { inventoryUpdateSchema } from "@/lib/schemas";
+import type { InventoryItem, RepairLocation, EditFormState } from "@/types/inventory";
 import { formatDate, truncateChars } from "@/lib/ticket-utils";
 import {
   ALL_FILTER_VALUE,
@@ -17,11 +14,7 @@ import {
   DEFAULT_FILTERS,
   DATE_TOOLTIPS,
 } from "@/constants/inventory";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CheckCircle2, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -103,39 +96,11 @@ export function InventoryPage() {
     setForm(toFormState(item));
   }
 
-  function validateForm(f: EditFormState): string | null {
-    if (f.outwardDate && !f.inwardDate) {
-      return "Inward date is required before setting an outward date";
-    }
-    if (f.inwardDate && f.outwardDate && f.outwardDate < f.inwardDate) {
-      return "Outward date cannot be before inward date";
-    }
-    if (f.repairLocation === "Outsourced") {
-      if (!f.outsourceVendor.trim()) {
-        return "Repair center name is required for outsourced repairs";
-      }
-      if (!f.expectedReturnDate) {
-        return "Expected return date is required for outsourced repairs";
-      }
-      if (!f.deliveryPerson.trim()) {
-        return "Delivery person is required for outsourced repairs";
-      }
-    }
-    if (
-      f.outwardDate &&
-      f.expectedReturnDate &&
-      f.expectedReturnDate > f.outwardDate
-    ) {
-      return "Expected return date cannot be after the outward date";
-    }
-    return null;
-  }
-
   async function handleSave() {
     if (!editingItem || !form) return;
-    const validationError = validateForm(form);
-    if (validationError) {
-      toast.error(validationError);
+    const parsed = inventoryUpdateSchema.safeParse(form);
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0].message);
       return;
     }
     const wasDispatched = Boolean(editingItem.outwardDate);
@@ -198,10 +163,7 @@ export function InventoryPage() {
         <Select
           value={filters.repairLocation ?? ALL_FILTER_VALUE}
           onValueChange={(v) =>
-            updateFilter(
-              "repairLocation",
-              v === ALL_FILTER_VALUE ? undefined : v
-            )
+            updateFilter("repairLocation", v === ALL_FILTER_VALUE ? undefined : v)
           }
         >
           <SelectTrigger className="w-44">
@@ -242,63 +204,56 @@ export function InventoryPage() {
                 />
               ) : (
                 items.map((item) => (
-                <TableRow key={item.srNo}>
-                  <TableCell className="text-sm font-medium">
-                    <Link
-                      to={`/tickets/${item.srNo}`}
-                      className="text-blue-800 hover:underline"
-                    >
-                      {item.ticketNo}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {truncateChars(item.companyName, 8)}
-                  </TableCell>
-                  <TableCell className="text-sm text-neutral-500">
-                    {truncateChars(item.model ?? "", 19)}
-                  </TableCell>
-                  <TableCell className="text-sm text-neutral-500">
-                    {truncateChars(item.serialNumber ?? "", 8) || "-"}
-                  </TableCell>
-                  <TableCell className="text-sm">{item.quantity}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="secondary"
-                      className={STATUS_CLASSES[item.derivedStatus]}
-                    >
-                      {item.derivedStatus}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-neutral-500">
-                    {item.inwardDate ? formatDate(item.inwardDate) : "-"}
-                  </TableCell>
-                  <TableCell className="text-sm text-neutral-500">
-                    {item.outwardDate ? formatDate(item.outwardDate) : "-"}
-                  </TableCell>
-                  <TableCell>
-                    {isCompleted(item) ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button size="sm" variant="outline" disabled className="gap-1.5 text-emerald-700">
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            Completed
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Already dispatched back to the customer — nothing left to update.
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openEdit(item)}
-                      >
-                        Update
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
+                  <TableRow key={item.srNo}>
+                    <TableCell className="text-sm font-medium">
+                      <Link to={`/tickets/${item.srNo}`} className="text-blue-800 hover:underline">
+                        {item.ticketNo}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-sm">{truncateChars(item.companyName, 8)}</TableCell>
+                    <TableCell className="text-sm text-neutral-500">
+                      {truncateChars(item.model ?? "", 19)}
+                    </TableCell>
+                    <TableCell className="text-sm text-neutral-500">
+                      {truncateChars(item.serialNumber ?? "", 8) || "-"}
+                    </TableCell>
+                    <TableCell className="text-sm">{item.quantity}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className={STATUS_CLASSES[item.derivedStatus]}>
+                        {item.derivedStatus}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-neutral-500">
+                      {item.inwardDate ? formatDate(item.inwardDate) : "-"}
+                    </TableCell>
+                    <TableCell className="text-sm text-neutral-500">
+                      {item.outwardDate ? formatDate(item.outwardDate) : "-"}
+                    </TableCell>
+                    <TableCell>
+                      {isCompleted(item) ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled
+                              className="gap-1.5 text-emerald-700"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Completed
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Already dispatched back to the customer — nothing left to update.
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
+                          Update
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
             </TableBody>
@@ -327,9 +282,7 @@ export function InventoryPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              Update Inventory — {editingItem?.ticketNo}
-            </DialogTitle>
+            <DialogTitle>Update Inventory — {editingItem?.ticketNo}</DialogTitle>
           </DialogHeader>
 
           {form && (
@@ -341,9 +294,7 @@ export function InventoryPage() {
                     <TooltipTrigger asChild>
                       <Info className="h-3.5 w-3.5 cursor-help text-primary" />
                     </TooltipTrigger>
-                    <TooltipContent>
-                      {DATE_TOOLTIPS["Inward Date"]}
-                    </TooltipContent>
+                    <TooltipContent>{DATE_TOOLTIPS["Inward Date"]}</TooltipContent>
                   </Tooltip>
                 </label>
                 <DatePicker
@@ -358,9 +309,7 @@ export function InventoryPage() {
                 </label>
                 <Select
                   value={form.repairLocation}
-                  onValueChange={(v) =>
-                    setForm({ ...form, repairLocation: v as RepairLocation })
-                  }
+                  onValueChange={(v) => setForm({ ...form, repairLocation: v as RepairLocation })}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -379,9 +328,7 @@ export function InventoryPage() {
                     </label>
                     <Input
                       value={form.outsourceVendor}
-                      onChange={(e) =>
-                        setForm({ ...form, outsourceVendor: e.target.value })
-                      }
+                      onChange={(e) => setForm({ ...form, outsourceVendor: e.target.value })}
                       placeholder="e.g. ABC Repair Center"
                     />
                   </div>
@@ -392,16 +339,12 @@ export function InventoryPage() {
                         <TooltipTrigger asChild>
                           <Info className="h-3.5 w-3.5 cursor-help text-primary" />
                         </TooltipTrigger>
-                        <TooltipContent>
-                          {DATE_TOOLTIPS["Expected Return Date"]}
-                        </TooltipContent>
+                        <TooltipContent>{DATE_TOOLTIPS["Expected Return Date"]}</TooltipContent>
                       </Tooltip>
                     </label>
                     <DatePicker
                       value={form.expectedReturnDate}
-                      onChange={(v) =>
-                        setForm({ ...form, expectedReturnDate: v })
-                      }
+                      onChange={(v) => setForm({ ...form, expectedReturnDate: v })}
                       placeholder="Not set"
                     />
                   </div>
@@ -419,9 +362,7 @@ export function InventoryPage() {
                     </label>
                     <Input
                       value={form.deliveryPerson}
-                      onChange={(e) =>
-                        setForm({ ...form, deliveryPerson: e.target.value })
-                      }
+                      onChange={(e) => setForm({ ...form, deliveryPerson: e.target.value })}
                       placeholder="e.g. Ramesh Kumar"
                     />
                   </div>
@@ -434,9 +375,7 @@ export function InventoryPage() {
                     <TooltipTrigger asChild>
                       <Info className="h-3.5 w-3.5 cursor-help text-primary" />
                     </TooltipTrigger>
-                    <TooltipContent>
-                      {DATE_TOOLTIPS["Outward Date"]}
-                    </TooltipContent>
+                    <TooltipContent>{DATE_TOOLTIPS["Outward Date"]}</TooltipContent>
                   </Tooltip>
                 </label>
                 <DatePicker
@@ -465,13 +404,16 @@ export function InventoryPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={closePromptSrNo !== null} onOpenChange={(open) => !open && setClosePromptSrNo(null)}>
+      <AlertDialog
+        open={closePromptSrNo !== null}
+        onOpenChange={(open) => !open && setClosePromptSrNo(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Close this ticket now?</AlertDialogTitle>
             <AlertDialogDescription>
-              The product has been marked as dispatched back to the customer. Would you
-              like to close the ticket now, or leave it open and close it later ?
+              The product has been marked as dispatched back to the customer. Would you like to
+              close the ticket now, or leave it open and close it later ?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

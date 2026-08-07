@@ -133,6 +133,63 @@ export const createUserSchema = z.object({
 });
 export type CreateUserValues = z.infer<typeof createUserSchema>;
 
+export const inventoryUpdateSchema = z
+  .object({
+    inwardDate: z.string(),
+    outwardDate: z.string(),
+    repairLocation: z.enum(["In-House", "Outsourced"]),
+    outsourceVendor: z.string(),
+    expectedReturnDate: z.string(),
+    deliveryPerson: z.string(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.outwardDate && !data.inwardDate) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["outwardDate"],
+        message: "Inward date is required before setting an outward date",
+      });
+    }
+    if (data.inwardDate && data.outwardDate && data.outwardDate < data.inwardDate) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["outwardDate"],
+        message: "Outward date cannot be before inward date",
+      });
+    }
+    if (data.repairLocation === "Outsourced") {
+      if (!data.outsourceVendor.trim()) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["outsourceVendor"],
+          message: "Repair center name is required for outsourced repairs",
+        });
+      }
+      if (!data.expectedReturnDate) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["expectedReturnDate"],
+          message: "Expected return date is required for outsourced repairs",
+        });
+      }
+      if (!data.deliveryPerson.trim()) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["deliveryPerson"],
+          message: "Delivery person is required for outsourced repairs",
+        });
+      }
+    }
+    if (data.outwardDate && data.expectedReturnDate && data.expectedReturnDate > data.outwardDate) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["expectedReturnDate"],
+        message: "Expected return date cannot be after the outward date",
+      });
+    }
+  });
+export type InventoryUpdateFormValues = z.infer<typeof inventoryUpdateSchema>;
+
 export const createAccountManagerSchema = z.object({
   name: z.string().min(1, "Required").max(100),
   email: z.string().min(1, "Required").email({ message: "Invalid email" }),
