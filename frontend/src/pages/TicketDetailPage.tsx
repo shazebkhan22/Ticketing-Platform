@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { isAxiosError } from "axios";
 import {
   StarIcon,
   Building2,
@@ -18,10 +19,7 @@ import {
   CheckCircle2,
   TriangleAlert,
 } from "lucide-react";
-import {
-  adminFeedbackResponseSchema,
-  ticketRemarkSchema as remarkSchema,
-} from "@/lib/schemas";
+import { adminFeedbackResponseSchema, ticketRemarkSchema as remarkSchema } from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -32,7 +30,12 @@ import {
 } from "@/hooks/useTickets";
 import { useAddToInventory } from "@/hooks/useInventory";
 import type { TicketStatus } from "@/types/ticket";
-import { STATUS_FLOW, PRIORITY_CLASSES, PRIORITY_LABELS } from "@/constants/ticket";
+import {
+  STATUS_FLOW,
+  PRIORITY_CLASSES,
+  PRIORITY_LABELS,
+  isLegalStatusTransition,
+} from "@/constants/ticket";
 import { StatusBadge } from "@/components/StatusBadge";
 import { InstallationReport } from "@/components/InstallationReport";
 import {
@@ -77,12 +80,22 @@ function Field({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
       <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">{label}</div>
-      <div className="mt-0.5 text-sm text-neutral-800 wrap-break-word whitespace-normal">{value || "-"}</div>
+      <div className="mt-0.5 text-sm text-neutral-800 wrap-break-word whitespace-normal">
+        {value || "-"}
+      </div>
     </div>
   );
 }
 
-function InfoPill({ icon: Icon, label, value }: { icon: typeof Building2; label: string; value?: string | null }) {
+function InfoPill({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Building2;
+  label: string;
+  value?: string | null;
+}) {
   return (
     <div className="flex items-center gap-2">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cygnus-50 text-cygnus-800">
@@ -185,8 +198,9 @@ export function TicketDetailPage() {
     try {
       await updateStatus.mutateAsync(status);
       toast.success(`Status changed to ${status}`);
-    } catch {
-      toast.error("Failed to change status");
+    } catch (err) {
+      const message = isAxiosError(err) ? err.response?.data?.error : undefined;
+      toast.error(typeof message === "string" ? message : "Failed to change status");
     } finally {
       setPendingStatus(null);
     }
@@ -275,7 +289,10 @@ export function TicketDetailPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={pendingStatus !== null} onOpenChange={(open) => !open && setPendingStatus(null)}>
+      <AlertDialog
+        open={pendingStatus !== null}
+        onOpenChange={(open) => !open && setPendingStatus(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -309,7 +326,10 @@ export function TicketDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleAddToInventory} disabled={addToInventoryMutation.isPending}>
+            <AlertDialogAction
+              onClick={handleAddToInventory}
+              disabled={addToInventoryMutation.isPending}
+            >
               {addToInventoryMutation.isPending ? "Adding..." : "Add to Inventory"}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -374,7 +394,9 @@ export function TicketDetailPage() {
 
         <div className="mb-6">
           <SectionCard icon={MessageSquare} title="Problem Description">
-            <p className="text-sm text-neutral-800 wrap-break-word whitespace-normal">{ticket.problem || "-"}</p>
+            <p className="text-sm text-neutral-800 wrap-break-word whitespace-normal">
+              {ticket.problem || "-"}
+            </p>
           </SectionCard>
         </div>
 
@@ -410,8 +432,8 @@ export function TicketDetailPage() {
                       {ticket.inInventory
                         ? "Added to Inventory"
                         : addToInventoryMutation.isPending
-                        ? "Adding..."
-                        : "Add to Inventory"}
+                          ? "Adding..."
+                          : "Add to Inventory"}
                     </Button>
                   </div>
                 )}
@@ -455,37 +477,58 @@ export function TicketDetailPage() {
                       const StatusIcon = STATUS_ICONS[s];
                       const isCurrent = idx === currentStatusIndex;
                       const blockedByInventory = s === "Closed" && ticket.inventoryPending;
+                      const blockedByTransition =
+                        !isCurrent && !isLegalStatusTransition(ticket.status, s);
                       const button = (
                         <Button
                           key={s}
                           size="sm"
                           variant={isCurrent ? "secondary" : "outline"}
                           className="gap-1.5"
-                          disabled={isCurrent || blockedByInventory || updateStatus.isPending}
+                          disabled={
+                            isCurrent ||
+                            blockedByInventory ||
+                            blockedByTransition ||
+                            updateStatus.isPending
+                          }
                           onClick={() => requestStatusChange(s)}
                         >
                           <StatusIcon className="h-3.5 w-3.5" />
                           {s}
                         </Button>
                       );
-                      return blockedByInventory ? (
-                        <Tooltip key={s}>
-                          <TooltipTrigger asChild>{button}</TooltipTrigger>
-                          <TooltipContent>
-                            Pending inventory dispatch — complete the outward workflow in Inventory first.
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        button
-                      );
+                      if (blockedByInventory) {
+                        return (
+                          <Tooltip key={s}>
+                            <TooltipTrigger asChild>{button}</TooltipTrigger>
+                            <TooltipContent>
+                              Pending inventory dispatch — complete the outward workflow in
+                              Inventory first.
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      }
+                      if (blockedByTransition) {
+                        return (
+                          <Tooltip key={s}>
+                            <TooltipTrigger asChild>{button}</TooltipTrigger>
+                            <TooltipContent>
+                              {ticket.status === "Closed"
+                                ? "Reopen the ticket to Pending first."
+                                : `Move to "${STATUS_FLOW[idx - 1] ?? s}" first.`}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      }
+                      return button;
                     })}
                   </div>
                   {ticket.inventoryPending && ticket.status !== "Closed" && (
                     <div className="mt-3 flex items-start gap-2 text-xs text-amber-700">
                       <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       <span>
-                        This ticket has a product in Inventory that hasn't been dispatched back to the
-                        customer yet — it can't be closed until that's done.
+                        This ticket has a product in Inventory that hasn't been dispatched back to
+                        the customer yet — it can't be closed until that's done.
                       </span>
                     </div>
                   )}
@@ -551,8 +594,8 @@ export function TicketDetailPage() {
                           {updateAdminFeedbackResponse.isPending
                             ? "Saving..."
                             : ticket.adminFeedbackResponse
-                            ? "Update Response"
-                            : "Save Response"}
+                              ? "Update Response"
+                              : "Save Response"}
                         </Button>
                       )}
                     </div>
@@ -562,7 +605,6 @@ export function TicketDetailPage() {
                 </div>
               </SectionCard>
             )}
-
           </div>
 
           <div className="space-y-6 lg:sticky lg:top-4">
@@ -586,7 +628,10 @@ export function TicketDetailPage() {
                   </span>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Badge variant="secondary" className={cn("rounded-full", PRIORITY_CLASSES[ticket.priority])}>
+                      <Badge
+                        variant="secondary"
+                        className={cn("rounded-full", PRIORITY_CLASSES[ticket.priority])}
+                      >
                         {ticket.priority}
                       </Badge>
                     </TooltipTrigger>

@@ -9,6 +9,7 @@ import { resolveAccountManagerName } from "../utils/accountManagers";
 import { broadcastEvent } from "../utils/sse";
 import { TICKET_STATUSES, TICKET_PRIORITIES } from "../types/ticket";
 import { PROJECT_TIME_UNITS } from "../types/project";
+import { allowedSourceStatuses } from "../utils/statusTransitions";
 
 const projectComponentSchema = z.object({
   model: z.string().min(1),
@@ -124,9 +125,13 @@ async function resolveAssignees(
   return { ok: true };
 }
 
-async function insertAssignees(projectSrNo: number, userIds: number[]) {
+async function insertAssignees(
+  queryable: Pick<typeof pool, "query">,
+  projectSrNo: number,
+  userIds: number[]
+) {
   const values = userIds.map((_, i) => `($1, $${i + 2})`).join(", ");
-  await pool.query(`INSERT INTO project_assignees (project_sr_no, user_id) VALUES ${values}`, [
+  await queryable.query(`INSERT INTO project_assignees (project_sr_no, user_id) VALUES ${values}`, [
     projectSrNo,
     ...userIds,
   ]);
@@ -339,42 +344,55 @@ export async function createProject(req: Request, res: Response) {
     address: d.address,
   });
 
-  const result = await pool.query(
-    `INSERT INTO projects (
-      project_no, start_date, time_value, time_unit, deadline_date, customer_id,
-      company_name, contact_name, contact_no, email_id, designation, department, address,
-      components, po_number, contract_number, problem, owner_user_id,
-      account_manager, account_manager_id, assigned_by, priority
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
-    RETURNING *`,
-    [
-      projectNo,
-      d.startDate,
-      d.timeValue,
-      d.timeUnit,
-      deadlineDate,
-      customerId,
-      d.companyName,
-      d.contactName ?? null,
-      d.contactNo ?? null,
-      d.emailId || null,
-      d.designation ?? null,
-      d.department ?? null,
-      d.address ?? null,
-      JSON.stringify(d.components ?? []),
-      d.poNumber ?? null,
-      d.contractNumber ?? null,
-      d.problem,
-      ownerUserId,
-      accountManagerName,
-      d.accountManagerId,
-      d.assignedBy,
-      d.priority ?? "P3",
-    ]
-  );
-
-  const project = result.rows[0];
-  await insertAssignees(project.sr_no, d.assigneeUserIds);
+  // The project row and its assignee set must land together — a crash or
+  // error between the two would otherwise leave an assignee-less project
+  // that no one has permission to see or edit.
+  const client = await pool.connect();
+  let project;
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      `INSERT INTO projects (
+        project_no, start_date, time_value, time_unit, deadline_date, customer_id,
+        company_name, contact_name, contact_no, email_id, designation, department, address,
+        components, po_number, contract_number, problem, owner_user_id,
+        account_manager, account_manager_id, assigned_by, priority
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+      RETURNING *`,
+      [
+        projectNo,
+        d.startDate,
+        d.timeValue,
+        d.timeUnit,
+        deadlineDate,
+        customerId,
+        d.companyName,
+        d.contactName ?? null,
+        d.contactNo ?? null,
+        d.emailId || null,
+        d.designation ?? null,
+        d.department ?? null,
+        d.address ?? null,
+        JSON.stringify(d.components ?? []),
+        d.poNumber ?? null,
+        d.contractNumber ?? null,
+        d.problem,
+        ownerUserId,
+        accountManagerName,
+        d.accountManagerId,
+        d.assignedBy,
+        d.priority ?? "P3",
+      ]
+    );
+    project = result.rows[0];
+    await insertAssignees(client, project.sr_no, d.assigneeUserIds);
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 
   await logActivity({
     actorUserId: req.session.userId,
@@ -508,44 +526,60 @@ export async function updateProject(req: Request, res: Response) {
     return res.status(400).json({ error: "No fields to update" });
   }
 
+  // The row update and the assignee-set replace must commit together —
+  // otherwise a failure between the DELETE and the INSERT could leave the
+  // project with no assignees at all.
   let project;
-  if (setClauses.length > 0) {
-    params.push(srNo);
-    const srNoParamIndex = params.length;
-    params.push(d.rowVersion);
-    const rowVersionParamIndex = params.length;
-    const result = await pool.query(
-      `UPDATE projects SET ${setClauses.join(", ")}
-       WHERE sr_no = $${srNoParamIndex} AND deleted_at IS NULL AND row_version = $${rowVersionParamIndex}
-       RETURNING *`,
-      params
-    );
-    if (result.rows.length === 0) {
-      const stillExists = await pool.query(
-        "SELECT 1 FROM projects WHERE sr_no = $1 AND deleted_at IS NULL",
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    if (setClauses.length > 0) {
+      params.push(srNo);
+      const srNoParamIndex = params.length;
+      params.push(d.rowVersion);
+      const rowVersionParamIndex = params.length;
+      const result = await client.query(
+        `UPDATE projects SET ${setClauses.join(", ")}
+         WHERE sr_no = $${srNoParamIndex} AND deleted_at IS NULL AND row_version = $${rowVersionParamIndex}
+         RETURNING *`,
+        params
+      );
+      if (result.rows.length === 0) {
+        const stillExists = await client.query(
+          "SELECT 1 FROM projects WHERE sr_no = $1 AND deleted_at IS NULL",
+          [srNo]
+        );
+        await client.query("ROLLBACK");
+        if (stillExists.rows.length === 0) {
+          return res.status(404).json({ error: "Project not found" });
+        }
+        return res.status(409).json({
+          error: "This project was changed by someone else. Please refresh and try again.",
+        });
+      }
+      project = result.rows[0];
+    } else {
+      const existing = await client.query(
+        "SELECT * FROM projects WHERE sr_no = $1 AND deleted_at IS NULL",
         [srNo]
       );
-      if (stillExists.rows.length === 0) {
+      if (existing.rows.length === 0) {
+        await client.query("ROLLBACK");
         return res.status(404).json({ error: "Project not found" });
       }
-      return res.status(409).json({
-        error: "This project was changed by someone else. Please refresh and try again.",
-      });
+      project = existing.rows[0];
     }
-    project = result.rows[0];
-  } else {
-    const existing = await pool.query("SELECT * FROM projects WHERE sr_no = $1 AND deleted_at IS NULL", [
-      srNo,
-    ]);
-    if (existing.rows.length === 0) {
-      return res.status(404).json({ error: "Project not found" });
-    }
-    project = existing.rows[0];
-  }
 
-  if (d.assigneeUserIds !== undefined) {
-    await pool.query("DELETE FROM project_assignees WHERE project_sr_no = $1", [srNo]);
-    await insertAssignees(srNo, d.assigneeUserIds);
+    if (d.assigneeUserIds !== undefined) {
+      await client.query("DELETE FROM project_assignees WHERE project_sr_no = $1", [srNo]);
+      await insertAssignees(client, srNo, d.assigneeUserIds);
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
 
   await logActivity({
@@ -575,14 +609,32 @@ export async function updateProjectStatus(req: Request, res: Response) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
+  // Fold the allowed-transition check into the UPDATE's WHERE clause
+  // (status = ANY(sources)) instead of a separate check-then-update, so a
+  // concurrent status change can't race between the read and the write.
+  // In the SET list below, `projects.status` refers to the pre-update
+  // value (Postgres evaluates all SET expressions against the old row).
+  const sources = allowedSourceStatuses(parsed.data.status);
   const closedAtClause = parsed.data.status === "Closed" ? ", closed_at = now()" : "";
   const result = await pool.query(
-    `UPDATE projects SET status = $1${closedAtClause} WHERE sr_no = $2 AND deleted_at IS NULL RETURNING *`,
-    [parsed.data.status, srNo]
+    `UPDATE projects SET status = $1${closedAtClause}
+     WHERE sr_no = $2 AND deleted_at IS NULL AND status = ANY($3)
+     RETURNING *`,
+    [parsed.data.status, srNo, sources]
   );
 
   if (result.rows.length === 0) {
-    return res.status(404).json({ error: "Project not found" });
+    const current = await pool.query(
+      "SELECT status FROM projects WHERE sr_no = $1 AND deleted_at IS NULL",
+      [srNo]
+    );
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    const currentStatus = current.rows[0].status;
+    return res.status(400).json({
+      error: `Cannot move a project from "${currentStatus}" to "${parsed.data.status}". Allowed order is Pending → In Progress → Closed, with reopening only from Closed back to Pending.`,
+    });
   }
 
   const project = result.rows[0];

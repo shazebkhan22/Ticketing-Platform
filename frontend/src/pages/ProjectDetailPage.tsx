@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { isAxiosError } from "axios";
 import { projectRemarkSchema as remarkSchema } from "@/lib/schemas";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -13,7 +14,7 @@ import {
 import { StarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TicketStatus } from "@/types/ticket";
-import { STATUS_FLOW } from "@/constants/ticket";
+import { STATUS_FLOW, isLegalStatusTransition } from "@/constants/ticket";
 import { ProjectStatusBadge } from "@/components/ProjectStatusBadge";
 import { InstallationReport } from "@/components/InstallationReport";
 import {
@@ -40,7 +41,9 @@ function Field({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
       <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">{label}</div>
-      <div className="mt-0.5 text-sm text-neutral-800 wrap-break-word whitespace-normal">{value || "-"}</div>
+      <div className="mt-0.5 text-sm text-neutral-800 wrap-break-word whitespace-normal">
+        {value || "-"}
+      </div>
     </div>
   );
 }
@@ -59,9 +62,15 @@ export function ProjectDetailPage() {
   const [newRemark, setNewRemark] = useState("");
   const [remarkError, setRemarkError] = useState<string | null>(null);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
-  const [installationDateChoice, setInstallationDateChoice] = useState<"deadline" | "custom">("deadline");
-  const [customInstallationDate, setCustomInstallationDate] = useState<string | undefined>(undefined);
-  const [confirmedInstallationDate, setConfirmedInstallationDate] = useState<string | undefined>(undefined);
+  const [installationDateChoice, setInstallationDateChoice] = useState<"deadline" | "custom">(
+    "deadline"
+  );
+  const [customInstallationDate, setCustomInstallationDate] = useState<string | undefined>(
+    undefined
+  );
+  const [confirmedInstallationDate, setConfirmedInstallationDate] = useState<string | undefined>(
+    undefined
+  );
   const [installationTime, setInstallationTime] = useState("");
   const [confirmedInstallationTime, setConfirmedInstallationTime] = useState("");
 
@@ -79,8 +88,7 @@ export function ProjectDetailPage() {
   const currentStatusIndex = STATUS_FLOW.indexOf(project.status);
   // Edit rights are admin-only for projects (unlike tickets, where assignees
   // can also edit) — see routes/projects.ts.
-  const canEdit = user?.role === "admin"|| project.assignees.some((a) => a.id === user?.id);
-
+  const canEdit = user?.role === "admin" || project.assignees.some((a) => a.id === user?.id);
 
   async function handleAddRemark() {
     const parsed = remarkSchema.safeParse(newRemark);
@@ -95,8 +103,13 @@ export function ProjectDetailPage() {
   }
 
   async function handleStatusChange(status: TicketStatus) {
-    await updateStatus.mutateAsync(status);
-    toast.success(`Status changed to ${status}`);
+    try {
+      await updateStatus.mutateAsync(status);
+      toast.success(`Status changed to ${status}`);
+    } catch (err) {
+      const message = isAxiosError(err) ? err.response?.data?.error : undefined;
+      toast.error(typeof message === "string" ? message : "Failed to change status");
+    }
   }
 
   const modelText = project.components.map((c) => `${c.model} (${c.quantity} Qty)`).join("\n");
@@ -122,7 +135,11 @@ export function ProjectDetailPage() {
           modelText={modelText}
           serialText={serialText}
           dateLabel="Installation Date"
-          date={confirmedInstallationDate ? formatDate(confirmedInstallationDate) : formatDate(project.deadlineDate)}
+          date={
+            confirmedInstallationDate
+              ? formatDate(confirmedInstallationDate)
+              : formatDate(project.deadlineDate)
+          }
           time={confirmedInstallationTime}
           engineerName={engineerName}
           status={project.status}
@@ -159,7 +176,9 @@ export function ProjectDetailPage() {
                   ? parseIsoDate(customInstallationDate)
                   : parseIsoDate(project.deadlineDate)
               }
-              onDateChange={(d) => setCustomInstallationDate(d ? format(d, "yyyy-MM-dd") : undefined)}
+              onDateChange={(d) =>
+                setCustomInstallationDate(d ? format(d, "yyyy-MM-dd") : undefined)
+              }
               dateDisabled={installationDateChoice === "deadline"}
               time={installationTime}
               onTimeChange={setInstallationTime}
@@ -173,7 +192,9 @@ export function ProjectDetailPage() {
               disabled={installationDateChoice === "custom" && !customInstallationDate}
               onClick={() => {
                 setConfirmedInstallationDate(
-                  installationDateChoice === "custom" ? customInstallationDate : project.deadlineDate
+                  installationDateChoice === "custom"
+                    ? customInstallationDate
+                    : project.deadlineDate
                 );
                 setConfirmedInstallationTime(installationTime);
                 setPrintDialogOpen(false);
@@ -192,12 +213,12 @@ export function ProjectDetailPage() {
         </DialogContent>
       </Dialog>
 
-            {remarks.some((r) => r.highlighted) && (
+      {remarks.some((r) => r.highlighted) && (
         <Card className="mb-6 border-orange-300 print:hidden">
           <CardContent>
             <h3 className="mb-3 flex items-center gap-1.5 text-xl font-bold text-red-600">
               <StarIcon className="h-4 w-4 fill-red-500 text-red-500" />
-            Roadblocks
+              Roadblocks
             </h3>
             <div className="flex flex-col gap-1">
               {remarks
@@ -220,204 +241,226 @@ export function ProjectDetailPage() {
       )}
 
       <div className="print:hidden">
-      <div className="no-print mb-6 flex items-center justify-between">
-        <div>
-          <Button onClick={() => navigate("/projects")}>← Back to projects</Button>
-          <h2 className="mt-3 text-xl font-bold text-neutral-800 flex items-center gap-2">
-            Project: {project.projectNo} <ProjectStatusBadge project={project} />
-          </h2>
-        </div>
-        <div className="flex gap-2">
-          {project.status === "Closed" && (
-          <Button
-            variant="outline"
-            onClick={() => {
-              setInstallationDateChoice("deadline");
-              setCustomInstallationDate(undefined);
-              setInstallationTime(format(new Date(), "HH:mm:ss"));
-              setPrintDialogOpen(true);
-            }}
-          >
-            Print
-          </Button>
-          )}
-          {canEdit && (
-            <Button onClick={() => navigate(`/projects/${project.srNo}/edit`)}>Edit</Button>
-          )}
-        </div>
-      </div>
-
-      <Card className="mb-6">
-        <CardContent>
-          <h3 className="mb-3 text-sm font-bold text-cygnus-700">Project Details</h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <Field label="Start Date" value={formatDate(project.startDate)} />
-            <Field label="Company Name" value={project.companyName} />
-            <Field label="Contact Name" value={project.contactName} />
-            <Field label="Contact No" value={project.contactNo} />
-            <Field label="Email" value={project.emailId} />
-            <Field label="Designation" value={project.designation} />
-            <Field label="Department" value={project.department} />
-            <Field label="PO Number" value={project.poNumber} />
-            <Field label="Contract Number" value={project.contractNumber} />
-            <div className="md:col-span-2">
-              <Field label="Address" value={project.address} />
-            </div>
-            <div className="md:col-span-3">
-              <Field label="Problem" value={project.problem} />
-            </div>
+        <div className="no-print mb-6 flex items-center justify-between">
+          <div>
+            <Button onClick={() => navigate("/projects")}>← Back to projects</Button>
+            <h2 className="mt-3 text-xl font-bold text-neutral-800 flex items-center gap-2">
+              Project: {project.projectNo} <ProjectStatusBadge project={project} />
+            </h2>
           </div>
-
-          <div className="mt-4">
-            <div className="mb-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-              Project Components
-            </div>
-            {project.components.length === 0 ? (
-              <p className="text-sm text-neutral-800">-</p>
-            ) : (
-              <div className="overflow-x-auto rounded-md border border-neutral-200">
-                <table className="w-full text-sm">
-                  <thead className="bg-neutral-50 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Model</th>
-                      <th className="px-3 py-2 text-left">Qty</th>
-                      <th className="px-3 py-2 text-left">Serial Number(s)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {project.components.map((c, idx) => (
-                      <tr key={idx} className="border-t border-neutral-200">
-                        <td className="px-3 py-2 text-neutral-800">{c.model}</td>
-                        <td className="px-3 py-2 text-neutral-800">{c.quantity}</td>
-                        <td className="px-3 py-2 text-neutral-800 whitespace-normal">
-                          {c.serialNumbers || "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          <div className="flex gap-2">
+            {project.status === "Closed" && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setInstallationDateChoice("deadline");
+                  setCustomInstallationDate(undefined);
+                  setInstallationTime(format(new Date(), "HH:mm:ss"));
+                  setPrintDialogOpen(true);
+                }}
+              >
+                Print
+              </Button>
+            )}
+            {canEdit && (
+              <Button onClick={() => navigate(`/projects/${project.srNo}/edit`)}>Edit</Button>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card className="mb-6">
-        <CardContent>
-          <h3 className="mb-3 text-sm font-bold text-cygnus-700">Assignment Details</h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <Field label="Account Manager" value={project.accountManager} />
-            <Field label="Assigned By" value={project.assignedBy} />
-            <div>
-              <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-                Assigned To
+        <Card className="mb-6">
+          <CardContent>
+            <h3 className="mb-3 text-sm font-bold text-cygnus-700">Project Details</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <Field label="Start Date" value={formatDate(project.startDate)} />
+              <Field label="Company Name" value={project.companyName} />
+              <Field label="Contact Name" value={project.contactName} />
+              <Field label="Contact No" value={project.contactNo} />
+              <Field label="Email" value={project.emailId} />
+              <Field label="Designation" value={project.designation} />
+              <Field label="Department" value={project.department} />
+              <Field label="PO Number" value={project.poNumber} />
+              <Field label="Contract Number" value={project.contractNumber} />
+              <div className="md:col-span-2">
+                <Field label="Address" value={project.address} />
               </div>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {project.assignees.length > 0 ? (
-                  project.assignees.map((a) => (
-                    <Badge key={a.id} variant="secondary">
-                      {a.displayName}
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-sm text-neutral-800">-</span>
-                )}
+              <div className="md:col-span-3">
+                <Field label="Problem" value={project.problem} />
               </div>
             </div>
-            <Field label="Priority" value={project.priority} />
-            <Field label="Time" value={`${project.timeValue} ${project.timeUnit}`} />
-            <Field label="Deadline" value={formatDate(project.deadlineDate)} />
-            <Field label="Created" value={formatDateTime(project.createdAt)} />
-            <Field label="Last Updated" value={formatDateTime(project.updatedAt)} />
-          </div>
 
-          {canEdit && (
-            <div className="no-print mt-6 flex items-center gap-3">
-              <span className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-                Change Status:
-              </span>
-              {STATUS_FLOW.map((s, idx) => (
-                <Button
-                  key={s}
-                  size="sm"
-                  variant={idx === currentStatusIndex ? "secondary" : "default"}
-                  disabled={idx === currentStatusIndex || updateStatus.isPending}
-                  onClick={() => handleStatusChange(s)}
-                >
-                  {s}
-                </Button>
-              ))}
+            <div className="mt-4">
+              <div className="mb-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                Project Components
+              </div>
+              {project.components.length === 0 ? (
+                <p className="text-sm text-neutral-800">-</p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border border-neutral-200">
+                  <table className="w-full text-sm">
+                    <thead className="bg-neutral-50 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Model</th>
+                        <th className="px-3 py-2 text-left">Qty</th>
+                        <th className="px-3 py-2 text-left">Serial Number(s)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {project.components.map((c, idx) => (
+                        <tr key={idx} className="border-t border-neutral-200">
+                          <td className="px-3 py-2 text-neutral-800">{c.model}</td>
+                          <td className="px-3 py-2 text-neutral-800">{c.quantity}</td>
+                          <td className="px-3 py-2 text-neutral-800 whitespace-normal">
+                            {c.serialNumbers || "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardContent>
-          <h3 className="mb-3 text-sm font-bold text-cygnus-700">Remarks Timeline</h3>
-          <div className="flex flex-col gap-3">
-            {remarks.length === 0 && <p className="text-sm text-neutral-400">No remarks yet.</p>}
-            {remarks.map((r) => (
-              <div
-                key={r.id}
-                className={cn(
-                  "rounded-r-md border-l-3 px-3.5 py-2",
-                  r.highlighted ? "border-orange-500 bg-orange-50" : "border-cygnus-600 bg-neutral-50"
-                )}
-              >
-                <div className="mb-1 flex items-center justify-between gap-2 capitalize">
-                  <div className="text-xs text-neutral-500">
-                    {formatDateTimeWithSeconds(r.createdAt)} {r.createdBy && `· ${r.createdBy}`}
-                  </div>
-                  {canEdit && (
-                    <button
-                      type="button"
-                      className="no-print shrink-0 text-neutral-400 hover:text-orange-500"
-                      disabled={highlightRemarkMutation.isPending}
-                      title={r.highlighted ? "Remove highlight" : "Highlight this remark"}
-                      onClick={() =>
-                        highlightRemarkMutation.mutate({ remarkId: r.id, highlighted: !r.highlighted })
-                      }
-                    >
-                      <StarIcon
-                        className={cn("h-4 w-4", r.highlighted && "fill-orange-500 text-orange-500")}
-                      />
-                    </button>
+        <Card className="mb-6">
+          <CardContent>
+            <h3 className="mb-3 text-sm font-bold text-cygnus-700">Assignment Details</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <Field label="Account Manager" value={project.accountManager} />
+              <Field label="Assigned By" value={project.assignedBy} />
+              <div>
+                <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                  Assigned To
+                </div>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {project.assignees.length > 0 ? (
+                    project.assignees.map((a) => (
+                      <Badge key={a.id} variant="secondary">
+                        {a.displayName}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-neutral-800">-</span>
                   )}
                 </div>
-                <div className={cn("text-sm text-neutral-800", r.highlighted && "font-bold")}>
-                  {r.body}
-                </div>
               </div>
-            ))}
-          </div>
-
-          {canEdit && (
-            <div className="no-print mt-4 border-t border-neutral-200 pt-4">
-              <label className="mb-1 block text-xs font-semibold text-neutral-500">Add Update</label>
-              <Textarea
-                capitalize
-                value={newRemark}
-                onChange={(e) => {
-                  setNewRemark(e.target.value);
-                  setRemarkError(null);
-                }}
-                rows={3}
-                placeholder="Describe the update..."
-                aria-invalid={Boolean(remarkError)}
-              />
-              {remarkError && <p className="mt-1 text-xs text-destructive">{remarkError}</p>}
-              <Button
-                disabled={addRemarkMutation.isPending || !newRemark.trim()}
-                onClick={handleAddRemark}
-                className="mt-2"
-              >
-                {addRemarkMutation.isPending ? "Adding..." : "Add Update"}
-              </Button>
+              <Field label="Priority" value={project.priority} />
+              <Field label="Time" value={`${project.timeValue} ${project.timeUnit}`} />
+              <Field label="Deadline" value={formatDate(project.deadlineDate)} />
+              <Field label="Created" value={formatDateTime(project.createdAt)} />
+              <Field label="Last Updated" value={formatDateTime(project.updatedAt)} />
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {canEdit && (
+              <div className="no-print mt-6 flex items-center gap-3">
+                <span className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                  Change Status:
+                </span>
+                {STATUS_FLOW.map((s, idx) => {
+                  const isCurrent = idx === currentStatusIndex;
+                  const blockedByTransition =
+                    !isCurrent && !isLegalStatusTransition(project.status, s);
+                  return (
+                    <Button
+                      key={s}
+                      size="sm"
+                      variant={isCurrent ? "secondary" : "default"}
+                      disabled={isCurrent || blockedByTransition || updateStatus.isPending}
+                      title={
+                        blockedByTransition
+                          ? project.status === "Closed"
+                            ? "Reopen the project to Pending first."
+                            : `Move to "${STATUS_FLOW[idx - 1] ?? s}" first.`
+                          : undefined
+                      }
+                      onClick={() => handleStatusChange(s)}
+                    >
+                      {s}
+                    </Button>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent>
+            <h3 className="mb-3 text-sm font-bold text-cygnus-700">Remarks Timeline</h3>
+            <div className="flex flex-col gap-3">
+              {remarks.length === 0 && <p className="text-sm text-neutral-400">No remarks yet.</p>}
+              {remarks.map((r) => (
+                <div
+                  key={r.id}
+                  className={cn(
+                    "rounded-r-md border-l-3 px-3.5 py-2",
+                    r.highlighted
+                      ? "border-orange-500 bg-orange-50"
+                      : "border-cygnus-600 bg-neutral-50"
+                  )}
+                >
+                  <div className="mb-1 flex items-center justify-between gap-2 capitalize">
+                    <div className="text-xs text-neutral-500">
+                      {formatDateTimeWithSeconds(r.createdAt)} {r.createdBy && `· ${r.createdBy}`}
+                    </div>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        className="no-print shrink-0 text-neutral-400 hover:text-orange-500"
+                        disabled={highlightRemarkMutation.isPending}
+                        title={r.highlighted ? "Remove highlight" : "Highlight this remark"}
+                        onClick={() =>
+                          highlightRemarkMutation.mutate({
+                            remarkId: r.id,
+                            highlighted: !r.highlighted,
+                          })
+                        }
+                      >
+                        <StarIcon
+                          className={cn(
+                            "h-4 w-4",
+                            r.highlighted && "fill-orange-500 text-orange-500"
+                          )}
+                        />
+                      </button>
+                    )}
+                  </div>
+                  <div className={cn("text-sm text-neutral-800", r.highlighted && "font-bold")}>
+                    {r.body}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {canEdit && (
+              <div className="no-print mt-4 border-t border-neutral-200 pt-4">
+                <label className="mb-1 block text-xs font-semibold text-neutral-500">
+                  Add Update
+                </label>
+                <Textarea
+                  capitalize
+                  value={newRemark}
+                  onChange={(e) => {
+                    setNewRemark(e.target.value);
+                    setRemarkError(null);
+                  }}
+                  rows={3}
+                  placeholder="Describe the update..."
+                  aria-invalid={Boolean(remarkError)}
+                />
+                {remarkError && <p className="mt-1 text-xs text-destructive">{remarkError}</p>}
+                <Button
+                  disabled={addRemarkMutation.isPending || !newRemark.trim()}
+                  onClick={handleAddRemark}
+                  className="mt-2"
+                >
+                  {addRemarkMutation.isPending ? "Adding..." : "Add Update"}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

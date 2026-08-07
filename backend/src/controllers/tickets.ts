@@ -8,6 +8,7 @@ import { resolveAccountManagerName } from "../utils/accountManagers";
 import { broadcastEvent } from "../utils/sse";
 import { sendMail } from "../utils/mailer";
 import { renderEmailHtml } from "../utils/emailTemplate";
+import { isLegalStatusTransition, allowedSourceStatuses } from "../utils/statusTransitions";
 import {
   TICKET_MODES,
   CALL_TYPES,
@@ -299,9 +300,13 @@ async function resolveAssignees(
   return { ok: true };
 }
 
-async function insertAssignees(ticketSrNo: number, userIds: number[]) {
+async function insertAssignees(
+  queryable: Pick<typeof pool, "query">,
+  ticketSrNo: number,
+  userIds: number[]
+) {
   const values = userIds.map((_, i) => `($1, $${i + 2})`).join(", ");
-  await pool.query(`INSERT INTO ticket_assignees (ticket_sr_no, user_id) VALUES ${values}`, [
+  await queryable.query(`INSERT INTO ticket_assignees (ticket_sr_no, user_id) VALUES ${values}`, [
     ticketSrNo,
     ...userIds,
   ]);
@@ -343,39 +348,52 @@ export async function createTicket(req: Request, res: Response) {
     address: d.address,
   });
 
-  const result = await pool.query(
-    `INSERT INTO tickets (
-      ticket_no, ticket_date, mode, customer_id, company_name, contact_name, contact_no, email_id, address,
-      model, serial_number, problem, owner_user_id, account_manager, account_manager_id, assigned_by, call_type,
-      priority, deadline_date, internal_tag
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
-    RETURNING *`,
-    [
-      ticketNo,
-      d.ticketDate,
-      d.mode,
-      customerId,
-      d.companyName,
-      d.contactName ?? null,
-      d.contactNo ?? null,
-      d.emailId || null,
-      d.address ?? null,
-      d.model ?? null,
-      d.serialNumber ?? null,
-      d.problem,
-      ownerUserId,
-      accountManagerName,
-      d.accountManagerId,
-      d.assignedBy,
-      d.callType,
-      d.priority ?? "P3",
-      d.deadlineDate || null,
-      d.internalTag ?? "External",
-    ]
-  );
-
-  const ticket = result.rows[0];
-  await insertAssignees(ticket.sr_no, d.assigneeUserIds);
+  // The ticket row and its assignee set must land together — a crash or
+  // error between the two would otherwise leave an assignee-less ticket
+  // that no one has permission to see or edit.
+  const client = await pool.connect();
+  let ticket;
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      `INSERT INTO tickets (
+        ticket_no, ticket_date, mode, customer_id, company_name, contact_name, contact_no, email_id, address,
+        model, serial_number, problem, owner_user_id, account_manager, account_manager_id, assigned_by, call_type,
+        priority, deadline_date, internal_tag
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+      RETURNING *`,
+      [
+        ticketNo,
+        d.ticketDate,
+        d.mode,
+        customerId,
+        d.companyName,
+        d.contactName ?? null,
+        d.contactNo ?? null,
+        d.emailId || null,
+        d.address ?? null,
+        d.model ?? null,
+        d.serialNumber ?? null,
+        d.problem,
+        ownerUserId,
+        accountManagerName,
+        d.accountManagerId,
+        d.assignedBy,
+        d.callType,
+        d.priority ?? "P3",
+        d.deadlineDate || null,
+        d.internalTag ?? "External",
+      ]
+    );
+    ticket = result.rows[0];
+    await insertAssignees(client, ticket.sr_no, d.assigneeUserIds);
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 
   await logActivity({
     actorUserId: req.session.userId,
@@ -502,47 +520,63 @@ export async function updateTicket(req: Request, res: Response) {
     return res.status(400).json({ error: "No fields to update" });
   }
 
+  // The row update and the assignee-set replace must commit together —
+  // otherwise a failure between the DELETE and the INSERT could leave the
+  // ticket with no assignees at all.
   let ticket;
-  if (setClauses.length > 0) {
-    params.push(srNo);
-    const srNoParamIndex = params.length;
-    params.push(d.rowVersion);
-    const rowVersionParamIndex = params.length;
-    const result = await pool.query(
-      `UPDATE tickets SET ${setClauses.join(", ")}
-       WHERE sr_no = $${srNoParamIndex} AND deleted_at IS NULL AND row_version = $${rowVersionParamIndex}
-       RETURNING *`,
-      params
-    );
-    if (result.rows.length === 0) {
-      // Distinguish "doesn't exist/already deleted" from "exists but someone
-      // else changed it first" — the frontend needs a different message (and
-      // different recovery action: refresh) for the latter.
-      const stillExists = await pool.query(
-        "SELECT 1 FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    if (setClauses.length > 0) {
+      params.push(srNo);
+      const srNoParamIndex = params.length;
+      params.push(d.rowVersion);
+      const rowVersionParamIndex = params.length;
+      const result = await client.query(
+        `UPDATE tickets SET ${setClauses.join(", ")}
+         WHERE sr_no = $${srNoParamIndex} AND deleted_at IS NULL AND row_version = $${rowVersionParamIndex}
+         RETURNING *`,
+        params
+      );
+      if (result.rows.length === 0) {
+        // Distinguish "doesn't exist/already deleted" from "exists but someone
+        // else changed it first" — the frontend needs a different message (and
+        // different recovery action: refresh) for the latter.
+        const stillExists = await client.query(
+          "SELECT 1 FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
+          [srNo]
+        );
+        await client.query("ROLLBACK");
+        if (stillExists.rows.length === 0) {
+          return res.status(404).json({ error: "Ticket not found" });
+        }
+        return res.status(409).json({
+          error: "This ticket was changed by someone else. Please refresh and try again.",
+        });
+      }
+      ticket = result.rows[0];
+    } else {
+      const existing = await client.query(
+        "SELECT * FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
         [srNo]
       );
-      if (stillExists.rows.length === 0) {
+      if (existing.rows.length === 0) {
+        await client.query("ROLLBACK");
         return res.status(404).json({ error: "Ticket not found" });
       }
-      return res.status(409).json({
-        error: "This ticket was changed by someone else. Please refresh and try again.",
-      });
+      ticket = existing.rows[0];
     }
-    ticket = result.rows[0];
-  } else {
-    const existing = await pool.query("SELECT * FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL", [
-      srNo,
-    ]);
-    if (existing.rows.length === 0) {
-      return res.status(404).json({ error: "Ticket not found" });
-    }
-    ticket = existing.rows[0];
-  }
 
-  if (d.assigneeUserIds !== undefined) {
-    await pool.query("DELETE FROM ticket_assignees WHERE ticket_sr_no = $1", [srNo]);
-    await insertAssignees(srNo, d.assigneeUserIds);
+    if (d.assigneeUserIds !== undefined) {
+      await client.query("DELETE FROM ticket_assignees WHERE ticket_sr_no = $1", [srNo]);
+      await insertAssignees(client, srNo, d.assigneeUserIds);
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
 
   await logActivity({
@@ -572,6 +606,15 @@ export async function updateTicketStatus(req: Request, res: Response) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
+  // Fold the allowed-transition check into the UPDATE's WHERE clause
+  // (status = ANY(sources)) instead of a separate check-then-update, so a
+  // concurrent status change can't race between the read and the write.
+  // In the SET list below, `tickets.status` refers to the pre-update value
+  // (Postgres evaluates all SET expressions against the old row), so the
+  // feedback-wipe columns can be conditioned on "was this Closed before
+  // this update" in the same atomic statement.
+  const sources = allowedSourceStatuses(parsed.data.status);
+
   let result;
   if (parsed.data.status === "Closed") {
     // The pending-inventory check and the update happen in the same
@@ -580,50 +623,56 @@ export async function updateTicketStatus(req: Request, res: Response) {
     // query and the update — this is a single atomic operation.
     result = await pool.query(
       `UPDATE tickets SET status = $1, closed_at = now()
-       WHERE sr_no = $2 AND deleted_at IS NULL
+       WHERE sr_no = $2 AND deleted_at IS NULL AND status = ANY($3)
          AND NOT EXISTS (
            SELECT 1 FROM ticket_inventory i WHERE i.ticket_sr_no = tickets.sr_no AND i.outward_date IS NULL
          )
        RETURNING *`,
-      [parsed.data.status, srNo]
+      [parsed.data.status, srNo, sources]
     );
-    if (result.rows.length === 0) {
-      const stillExists = await pool.query(
-        "SELECT 1 FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
-        [srNo]
-      );
-      if (stillExists.rows.length === 0) {
-        return res.status(404).json({ error: "Ticket not found" });
-      }
-      return res.status(400).json({
-        error: "This ticket has a pending inventory item that hasn't been dispatched yet. Complete the outward workflow in Inventory before closing.",
-      });
-    }
   } else {
     // Leaving Closed (reopening) starts a fresh notification/feedback
     // cycle — otherwise a second close later would silently skip the
     // closure email and feedback request (guarded by these same columns
     // being non-null from the first close), and the old rating/comment
     // would keep showing against a ticket that's since been reworked.
+    // Moving between the other two statuses leaves feedback untouched
+    // since the ticket was never closed on this cycle.
     result = await pool.query(
       `UPDATE tickets SET
          status = $1,
-         closed_notified_at = NULL,
-         feedback_token = NULL,
-         feedback_requested_at = NULL,
-         customer_feedback_rating = NULL,
-         customer_feedback_comment = NULL,
-         customer_feedback_submitted_at = NULL,
-         admin_feedback_response = NULL,
-         admin_feedback_responded_at = NULL,
-         admin_feedback_responded_by = NULL
-       WHERE sr_no = $2 AND deleted_at IS NULL
+         closed_notified_at = CASE WHEN tickets.status = 'Closed' THEN NULL ELSE closed_notified_at END,
+         feedback_token = CASE WHEN tickets.status = 'Closed' THEN NULL ELSE feedback_token END,
+         feedback_requested_at = CASE WHEN tickets.status = 'Closed' THEN NULL ELSE feedback_requested_at END,
+         customer_feedback_rating = CASE WHEN tickets.status = 'Closed' THEN NULL ELSE customer_feedback_rating END,
+         customer_feedback_comment = CASE WHEN tickets.status = 'Closed' THEN NULL ELSE customer_feedback_comment END,
+         customer_feedback_submitted_at = CASE WHEN tickets.status = 'Closed' THEN NULL ELSE customer_feedback_submitted_at END,
+         admin_feedback_response = CASE WHEN tickets.status = 'Closed' THEN NULL ELSE admin_feedback_response END,
+         admin_feedback_responded_at = CASE WHEN tickets.status = 'Closed' THEN NULL ELSE admin_feedback_responded_at END,
+         admin_feedback_responded_by = CASE WHEN tickets.status = 'Closed' THEN NULL ELSE admin_feedback_responded_by END
+       WHERE sr_no = $2 AND deleted_at IS NULL AND status = ANY($3)
        RETURNING *`,
-      [parsed.data.status, srNo]
+      [parsed.data.status, srNo, sources]
     );
-    if (result.rows.length === 0) {
+  }
+
+  if (result.rows.length === 0) {
+    const current = await pool.query(
+      "SELECT status FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
+      [srNo]
+    );
+    if (current.rows.length === 0) {
       return res.status(404).json({ error: "Ticket not found" });
     }
+    const currentStatus = current.rows[0].status;
+    if (!isLegalStatusTransition(currentStatus, parsed.data.status)) {
+      return res.status(400).json({
+        error: `Cannot move a ticket from "${currentStatus}" to "${parsed.data.status}". Allowed order is Pending → In Progress → Closed, with reopening only from Closed back to Pending.`,
+      });
+    }
+    return res.status(400).json({
+      error: "This ticket has a pending inventory item that hasn't been dispatched yet. Complete the outward workflow in Inventory before closing.",
+    });
   }
 
   const ticket = result.rows[0];

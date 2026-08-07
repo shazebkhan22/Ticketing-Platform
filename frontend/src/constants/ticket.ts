@@ -2,6 +2,20 @@ import type { TicketPriority, TicketStatus } from "@/types/ticket";
 
 export const STATUS_FLOW: TicketStatus[] = ["Pending", "In Progress", "Closed"];
 
+// Mirrors backend/src/utils/statusTransitions.ts — Pending -> In Progress ->
+// Closed, with reopen only from Closed back to Pending. Kept in sync so the
+// status buttons can be disabled client-side instead of only failing server-side.
+const ALLOWED_STATUS_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
+  Pending: ["In Progress", "Closed"],
+  "In Progress": ["Closed"],
+  Closed: ["Pending"],
+};
+
+export function isLegalStatusTransition(from: TicketStatus, to: TicketStatus): boolean {
+  if (from === to) return true;
+  return ALLOWED_STATUS_TRANSITIONS[from].includes(to);
+}
+
 export const STATUS_CLASSES: Record<string, string> = {
   Pending: "bg-amber-100 text-amber-800",
   "In Progress": "bg-blue-100 text-blue-800",
@@ -27,7 +41,8 @@ export const PRIORITY_LABELS: Record<TicketPriority, string> = {
 // Inventory only tracks tickets that have a serial number (see InventoryPage's
 // "Inventory only tracks tickets that have a serial number" empty state) —
 // these two fields are the ones that gate whether a ticket shows up there.
-const INVENTORY_VISIBILITY_HINT = "Leaving this part empty means it won't show up on the Inventory page.";
+const INVENTORY_VISIBILITY_HINT =
+  "Leaving this part empty means it won't show up on the Inventory page.";
 
 export const TICKET_FIELD_TOOLTIPS = {
   Model: INVENTORY_VISIBILITY_HINT,

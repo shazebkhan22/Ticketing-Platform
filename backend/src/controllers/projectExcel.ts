@@ -532,7 +532,13 @@ export async function importProjects(req: Request, res: Response) {
       ...new Set(assigneeNames.map((name) => employeeIdByName.get(name.toLowerCase())!)),
     ];
 
+    // The project row and its assignee set must land together — without a
+    // transaction, a failure between the two inserts would leave an
+    // assignee-less project that no one has permission to see or edit,
+    // silently, in a 2000-row bulk import.
+    const client = await pool.connect();
     try {
+      await client.query("BEGIN");
       const startDate = new Date(d.startDate);
       const projectNo = await generateProjectNumber(startDate);
       const deadlineDate = computeDeadline(d.startDate, d.timeValue, d.timeUnit as ProjectTimeUnit);
@@ -545,7 +551,7 @@ export async function importProjects(req: Request, res: Response) {
       });
       const components = parseComponentsFromExcel(d.components);
       const accountManagerId = accountManagerIdByName.get(d.accountManager.toLowerCase()) ?? null;
-      const inserted = await pool.query(
+      const inserted = await client.query(
         `INSERT INTO projects (
           project_no, start_date, time_value, time_unit, deadline_date, customer_id,
           company_name, contact_name, contact_no, email_id, designation, department, address,
@@ -581,17 +587,21 @@ export async function importProjects(req: Request, res: Response) {
       );
       const projectSrNo = inserted.rows[0].sr_no;
       const assigneeValues = assigneeUserIds.map((_, i) => `($1, $${i + 2})`).join(", ");
-      await pool.query(
+      await client.query(
         `INSERT INTO project_assignees (project_sr_no, user_id) VALUES ${assigneeValues}`,
         [projectSrNo, ...assigneeUserIds]
       );
+      await client.query("COMMIT");
       results.push({ row: rowNumber, success: true, projectNo });
     } catch (err) {
+      await client.query("ROLLBACK");
       results.push({
         row: rowNumber,
         success: false,
         error: err instanceof Error ? err.message : "Unknown error",
       });
+    } finally {
+      client.release();
     }
   }
 
