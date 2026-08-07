@@ -6,6 +6,8 @@ import { logActivity } from "../utils/activityLog";
 import { getOrCreateCustomerId } from "../utils/customers";
 import { resolveAccountManagerName } from "../utils/accountManagers";
 import { broadcastEvent } from "../utils/sse";
+import { sendMail } from "../utils/mailer";
+import { renderEmailHtml } from "../utils/emailTemplate";
 import {
   TICKET_MODES,
   CALL_TYPES,
@@ -97,6 +99,8 @@ function rowToTicket(row: any) {
     closedAt: row.closed_at,
     lastRemark: row.last_remark ?? undefined,
     rowVersion: row.row_version,
+    inInventory: row.in_inventory ?? false,
+    inventoryPending: row.inventory_pending ?? false,
   };
 }
 
@@ -105,7 +109,7 @@ function rowToTicket(row: any) {
 // can keep using t.* + pagination/ORDER BY without a GROUP BY.
 const ASSIGNEES_LATERAL_JOIN = `
   LEFT JOIN LATERAL (
-    SELECT json_agg(json_build_object('id', ta.user_id, 'displayName', u.display_name) ORDER BY u.display_name) AS assignees
+    SELECT json_agg(json_build_object('id', ta.user_id, 'displayName', u.display_name, 'team', u.team) ORDER BY u.display_name) AS assignees
     FROM ticket_assignees ta
     JOIN users u ON u.id = ta.user_id
     WHERE ta.ticket_sr_no = t.sr_no
@@ -246,7 +250,9 @@ export async function getSummary(req: Request, res: Response) {
 export async function getTicket(req: Request, res: Response) {
   const srNo = parseInt(req.params.srNo, 10);
   const result = await pool.query(
-    `SELECT t.*, COALESCE(assignee_agg.assignees, '[]'::json) AS assignees
+    `SELECT t.*, COALESCE(assignee_agg.assignees, '[]'::json) AS assignees,
+       EXISTS (SELECT 1 FROM ticket_inventory i WHERE i.ticket_sr_no = t.sr_no) AS in_inventory,
+       EXISTS (SELECT 1 FROM ticket_inventory i WHERE i.ticket_sr_no = t.sr_no AND i.outward_date IS NULL) AS inventory_pending
      FROM tickets t
      ${ASSIGNEES_LATERAL_JOIN}
      WHERE t.sr_no = $1 AND t.deleted_at IS NULL`,
@@ -566,14 +572,58 @@ export async function updateTicketStatus(req: Request, res: Response) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
-  const closedAtClause = parsed.data.status === "Closed" ? ", closed_at = now()" : "";
-  const result = await pool.query(
-    `UPDATE tickets SET status = $1${closedAtClause} WHERE sr_no = $2 AND deleted_at IS NULL RETURNING *`,
-    [parsed.data.status, srNo]
-  );
-
-  if (result.rows.length === 0) {
-    return res.status(404).json({ error: "Ticket not found" });
+  let result;
+  if (parsed.data.status === "Closed") {
+    // The pending-inventory check and the update happen in the same
+    // statement (NOT EXISTS in the WHERE clause) so a concurrent request
+    // can't slip a fresh ticket_inventory row in between a separate check
+    // query and the update — this is a single atomic operation.
+    result = await pool.query(
+      `UPDATE tickets SET status = $1, closed_at = now()
+       WHERE sr_no = $2 AND deleted_at IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM ticket_inventory i WHERE i.ticket_sr_no = tickets.sr_no AND i.outward_date IS NULL
+         )
+       RETURNING *`,
+      [parsed.data.status, srNo]
+    );
+    if (result.rows.length === 0) {
+      const stillExists = await pool.query(
+        "SELECT 1 FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
+        [srNo]
+      );
+      if (stillExists.rows.length === 0) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      return res.status(400).json({
+        error: "This ticket has a pending inventory item that hasn't been dispatched yet. Complete the outward workflow in Inventory before closing.",
+      });
+    }
+  } else {
+    // Leaving Closed (reopening) starts a fresh notification/feedback
+    // cycle — otherwise a second close later would silently skip the
+    // closure email and feedback request (guarded by these same columns
+    // being non-null from the first close), and the old rating/comment
+    // would keep showing against a ticket that's since been reworked.
+    result = await pool.query(
+      `UPDATE tickets SET
+         status = $1,
+         closed_notified_at = NULL,
+         feedback_token = NULL,
+         feedback_requested_at = NULL,
+         customer_feedback_rating = NULL,
+         customer_feedback_comment = NULL,
+         customer_feedback_submitted_at = NULL,
+         admin_feedback_response = NULL,
+         admin_feedback_responded_at = NULL,
+         admin_feedback_responded_by = NULL
+       WHERE sr_no = $2 AND deleted_at IS NULL
+       RETURNING *`,
+      [parsed.data.status, srNo]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
   }
 
   const ticket = result.rows[0];
@@ -586,6 +636,29 @@ export async function updateTicketStatus(req: Request, res: Response) {
     ticketNo: ticket.ticket_no,
     details: `New status: ${parsed.data.status}`,
   });
+
+  if (parsed.data.status === "Closed" && !ticket.closed_notified_at && ticket.email_id) {
+    // Tickets dispatched through the inventory workflow already got a
+    // "Repair Completed and Dispatched" email when the outward date was
+    // set (see upsertInventory) — that serves as their closure notice, so
+    // only send this generic one for tickets that never went through it.
+    const inventoryResult = await pool.query(
+      "SELECT 1 FROM ticket_inventory WHERE ticket_sr_no = $1 AND outward_notified_at IS NOT NULL",
+      [srNo]
+    );
+    if (inventoryResult.rows.length === 0) {
+      const text = `Dear ${ticket.contact_name || "Customer"},\n\nGreetings from the Cygnus Support Team.\n\nWe are writing to inform you that the reported issue has been successfully resolved, and the case is now being marked as closed from our end.\n\nCase Reference Number: ${ticket.ticket_no}\nReported Issue: ${ticket.problem}\n\nIf you feel the issue has not been fully resolved or requires further attention, please let us know and we will be happy to assist you further.\n\nBest regards,\nSupport Team`;
+      const sent = await sendMail({
+        to: ticket.email_id,
+        subject: `Ticket Closed — ${ticket.ticket_no}`,
+        text,
+        html: renderEmailHtml(text),
+      });
+      if (sent) {
+        await pool.query("UPDATE tickets SET closed_notified_at = now() WHERE sr_no = $1", [srNo]);
+      }
+    }
+  }
 
   res.json(rowToTicket(ticket));
 }

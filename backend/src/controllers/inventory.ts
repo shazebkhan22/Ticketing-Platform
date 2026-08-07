@@ -40,6 +40,7 @@ function rowToInventoryItem(row: any) {
     repairLocation: row.repair_location ?? "In-House",
     outsourceVendor: row.outsource_vendor,
     expectedReturnDate: row.expected_return_date,
+    deliveryPerson: row.delivery_person,
     derivedStatus: deriveStatus({
       inward_date: row.inward_date,
       outward_date: row.outward_date,
@@ -57,8 +58,17 @@ export async function listInventory(req: Request, res: Response) {
     pageSize = "7",
   } = req.query as Record<string, string>;
 
-  const conditions: string[] = [`t.deleted_at IS NULL`, `t.serial_number IS NOT NULL`, `t.serial_number <> ''`];
+  const conditions: string[] = [`t.deleted_at IS NULL`, `i.ticket_sr_no IS NOT NULL`];
   const params: any[] = [];
+
+  // Admins see every ticket's inventory item; employees only see items on
+  // tickets they're assigned to (mirrors requireTicketAssigneeOrAdmin).
+  if (req.session.role !== "admin") {
+    params.push(req.session.userId);
+    conditions.push(
+      `EXISTS (SELECT 1 FROM ticket_assignees ta WHERE ta.ticket_sr_no = t.sr_no AND ta.user_id = $${params.length})`
+    );
+  }
 
   if (search) {
     params.push(`%${search}%`);
@@ -76,7 +86,8 @@ export async function listInventory(req: Request, res: Response) {
   const result = await pool.query(
     `SELECT
       t.sr_no, t.ticket_no, t.company_name, t.model, t.serial_number,
-      i.inward_date, i.outward_date, i.repair_location, i.outsource_vendor, i.expected_return_date
+      i.inward_date, i.outward_date, i.repair_location, i.outsource_vendor, i.expected_return_date,
+      i.delivery_person
     FROM tickets t
     LEFT JOIN ticket_inventory i ON i.ticket_sr_no = t.sr_no
     ${whereClause}
@@ -105,12 +116,53 @@ export async function listInventory(req: Request, res: Response) {
   res.json({ items: pageItems, total, page: pageNum, pageSize: limit });
 }
 
+// Called from the ticket detail page — creates a bare ticket_inventory row
+// (no inward/outward data yet) so the ticket starts showing up on the
+// Inventory page. Any assignee or admin can do this; filling in the actual
+// inward/outward workflow below remains admin-only via upsertInventory.
+export async function addToInventory(req: Request, res: Response) {
+  const srNo = parseInt(req.params.srNo, 10);
+
+  const ticketResult = await pool.query(
+    "SELECT sr_no, status FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
+    [srNo]
+  );
+  if (ticketResult.rows.length === 0) {
+    return res.status(404).json({ error: "Ticket not found" });
+  }
+  if (ticketResult.rows[0].status === "Closed") {
+    return res.status(400).json({ error: "Cannot add a closed ticket to inventory — reopen it first" });
+  }
+
+  const result = await pool.query(
+    `INSERT INTO ticket_inventory (ticket_sr_no)
+     VALUES ($1)
+     ON CONFLICT (ticket_sr_no) DO NOTHING
+     RETURNING *`,
+    [srNo]
+  );
+  const row =
+    result.rows[0] ??
+    (await pool.query("SELECT * FROM ticket_inventory WHERE ticket_sr_no = $1", [srNo])).rows[0];
+
+  res.json({
+    srNo: row.ticket_sr_no,
+    inwardDate: row.inward_date,
+    outwardDate: row.outward_date,
+    repairLocation: row.repair_location,
+    outsourceVendor: row.outsource_vendor,
+    expectedReturnDate: row.expected_return_date,
+    deliveryPerson: row.delivery_person,
+  });
+}
+
 const upsertInventorySchema = z.object({
   inwardDate: z.string().optional(),
   outwardDate: z.string().optional(),
   repairLocation: z.enum(REPAIR_LOCATIONS).optional(),
   outsourceVendor: z.string().optional(),
   expectedReturnDate: z.string().optional(),
+  deliveryPerson: z.string().optional(),
 });
 
 export async function upsertInventory(req: Request, res: Response) {
@@ -134,13 +186,16 @@ export async function upsertInventory(req: Request, res: Response) {
     if (!d.expectedReturnDate) {
       return res.status(400).json({ error: "Expected return date is required for outsourced repairs" });
     }
+    if (!d.deliveryPerson?.trim()) {
+      return res.status(400).json({ error: "Delivery person is required for outsourced repairs" });
+    }
   }
   if (d.outwardDate && d.expectedReturnDate && d.expectedReturnDate > d.outwardDate) {
     return res.status(400).json({ error: "Expected return date cannot be after the outward date" });
   }
 
   const ticketResult = await pool.query(
-    "SELECT sr_no, ticket_no, company_name, contact_name, email_id FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
+    "SELECT sr_no, ticket_no, company_name, contact_name, email_id, problem, closed_notified_at FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
     [srNo]
   );
   if (ticketResult.rows.length === 0) {
@@ -156,19 +211,24 @@ export async function upsertInventory(req: Request, res: Response) {
   const newOutwardDate = d.outwardDate || null;
   // Only notify the first time an outward date is actually set — re-saving
   // the same (or a different) outward date on an already-notified ticket
-  // shouldn't send another "your product has shipped" email.
-  const shouldNotify = newOutwardDate && !existing?.outward_date && !existing?.outward_notified_at;
+  // shouldn't send another "your product has shipped" email. Also skip if
+  // the ticket was already closed (and its generic "Ticket Closed" email
+  // sent) before this outward date was set — that email already told the
+  // customer their case is resolved, so this one would be redundant.
+  const shouldNotify =
+    newOutwardDate && !existing?.outward_date && !existing?.outward_notified_at && !ticket.closed_notified_at;
 
   const result = await pool.query(
     `INSERT INTO ticket_inventory (
-      ticket_sr_no, inward_date, outward_date, repair_location, outsource_vendor, expected_return_date
-    ) VALUES ($1, $2, $3, $4, $5, $6)
+      ticket_sr_no, inward_date, outward_date, repair_location, outsource_vendor, expected_return_date, delivery_person
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
     ON CONFLICT (ticket_sr_no) DO UPDATE SET
       inward_date = EXCLUDED.inward_date,
       outward_date = EXCLUDED.outward_date,
       repair_location = EXCLUDED.repair_location,
       outsource_vendor = EXCLUDED.outsource_vendor,
-      expected_return_date = EXCLUDED.expected_return_date
+      expected_return_date = EXCLUDED.expected_return_date,
+      delivery_person = EXCLUDED.delivery_person
     RETURNING *`,
     [
       srNo,
@@ -177,12 +237,13 @@ export async function upsertInventory(req: Request, res: Response) {
       d.repairLocation ?? "In-House",
       d.outsourceVendor || null,
       d.expectedReturnDate || null,
+      d.deliveryPerson || null,
     ]
   );
 
   let row = result.rows[0];
   if (shouldNotify && ticket.email_id) {
-    const text = `Dear ${ticket.contact_name},\n\n Greetings from the Cygnus Support Team.\n\nWe are writing to inform you that the reported issue has been successfully resolved, and the case is now being marked as closed from our end.\n\nCase Reference Number: ${ticket.ticket_no} \n\nIf you feel the issue has not been fully resolved or requires further attention, please let us know and we will be happy to assist you further.\n\nBest regards,\nSupport Team`;
+    const text = `Dear ${ticket.contact_name || "Customer"},\n\nGreetings from the Cygnus Support Team.\n\nWe are writing to inform you that the reported issue has been successfully resolved, and the case is now being marked as closed from our end.\n\nCase Reference Number: ${ticket.ticket_no}\nReported Issue: ${ticket.problem}\n\nIf you feel the issue has not been fully resolved or requires further attention, please let us know and we will be happy to assist you further.\n\nBest regards,\nSupport Team`;
 
     const sent = await sendMail({
       to: ticket.email_id,
@@ -206,5 +267,6 @@ export async function upsertInventory(req: Request, res: Response) {
     repairLocation: row.repair_location,
     outsourceVendor: row.outsource_vendor,
     expectedReturnDate: row.expected_return_date,
+    deliveryPerson: row.delivery_person,
   });
 }

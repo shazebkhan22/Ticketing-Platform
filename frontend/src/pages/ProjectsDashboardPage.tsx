@@ -208,7 +208,7 @@ export function ProjectsDashboardPage() {
             <AlertDialogTitle>Export projects to Excel?</AlertDialogTitle>
             <AlertDialogDescription>
               This will download an .xlsx file of every project matching your
-              current filters (not just the current page).
+              current filters.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="mb-2">

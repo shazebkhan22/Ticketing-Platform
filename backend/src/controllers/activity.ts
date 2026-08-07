@@ -17,23 +17,23 @@ export async function listActivity(req: Request, res: Response) {
 
   if (ticketSrNo) {
     params.push(ticketSrNo);
-    conditions.push(`ticket_sr_no = $${params.length}`);
+    conditions.push(`al.ticket_sr_no = $${params.length}`);
   }
   if (actorUserId) {
     params.push(actorUserId);
-    conditions.push(`actor_user_id = $${params.length}`);
+    conditions.push(`al.actor_user_id = $${params.length}`);
   }
   if (action) {
     params.push(action);
-    conditions.push(`action = $${params.length}`);
+    conditions.push(`al.action = $${params.length}`);
   }
   if (dateFrom) {
     params.push(dateFrom);
-    conditions.push(`created_at >= $${params.length}`);
+    conditions.push(`al.created_at >= $${params.length}`);
   }
   if (dateTo) {
     params.push(dateTo);
-    conditions.push(`created_at < ($${params.length}::date + interval '1 day')`);
+    conditions.push(`al.created_at < ($${params.length}::date + interval '1 day')`);
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -41,14 +41,19 @@ export async function listActivity(req: Request, res: Response) {
   const limit = Math.min(parseInt(pageSize, 10) || 50, 200);
   const offset = (Math.max(parseInt(page, 10) || 1, 1) - 1) * limit;
 
+  // actor_name on the row is a username snapshot from when the action
+  // happened — prefer the user's current display_name via the FK, falling
+  // back to that snapshot only if the user's since been deleted.
   const query = `
-    SELECT id, actor_user_id, actor_name, action, ticket_sr_no, ticket_no, details, created_at
-    FROM activity_log
+    SELECT al.id, al.actor_user_id, COALESCE(u.display_name, al.actor_name) AS actor_name,
+      al.action, al.ticket_sr_no, al.ticket_no, al.details, al.created_at
+    FROM activity_log al
+    LEFT JOIN users u ON u.id = al.actor_user_id
     ${whereClause}
-    ORDER BY created_at DESC
+    ORDER BY al.created_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
-  const countQuery = `SELECT COUNT(*) FROM activity_log ${whereClause}`;
+  const countQuery = `SELECT COUNT(*) FROM activity_log al ${whereClause}`;
 
   const [rowsResult, countResult] = await Promise.all([
     pool.query(query, params),

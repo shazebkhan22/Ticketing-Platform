@@ -106,6 +106,20 @@ export function useUpdateTicketStatus(srNo: number) {
   });
 }
 
+// Same as useUpdateTicketStatus, but for callers that don't have a single
+// fixed srNo up front — e.g. the Inventory page, which offers "close this
+// ticket" for whichever row was just dispatched.
+export function useUpdateTicketStatusForAnyTicket() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ srNo, status }: { srNo: number; status: string }) => updateTicketStatus(srNo, status),
+    onSuccess: (_data, { srNo }) => {
+      queryClient.invalidateQueries({ queryKey: ticketKeys.all });
+      queryClient.invalidateQueries({ queryKey: ticketKeys.detail(srNo) });
+    },
+  });
+}
+
 export function useUpdateAdminFeedbackResponse(srNo: number) {
   const invalidate = useInvalidateTicket(srNo);
   return useMutation({

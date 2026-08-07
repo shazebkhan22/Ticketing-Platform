@@ -12,7 +12,7 @@ import { logger } from "../utils/logger";
 // it's actually needed.
 async function runFeedbackReminderSweep() {
   const result = await pool.query(
-    `SELECT sr_no, ticket_no, company_name,contact_name, email_id
+    `SELECT sr_no, ticket_no, company_name,contact_name, email_id, problem
      FROM tickets
      WHERE deleted_at IS NULL
        AND status = 'Closed'
@@ -25,9 +25,9 @@ async function runFeedbackReminderSweep() {
 
   for (const ticket of result.rows) {
     const token = generateFeedbackToken();
-    const link = `${env.frontendOrigin}/feedback/${token}`;
+    const link = `${env.dnsOrigin || env.frontendOrigin}/feedback/${token}`;
 
-    const text = `Dear ${ticket.contact_name},\n\nYour ticket ${ticket.ticket_no} has recently been closed. To help us improve our service quality, we kindly request your feedback on the support experience. Please rate your overall satisfaction on a scale of 1 to 5, where:\n1 – Very Dissatisfied\n2 – Dissatisfied\n3 – Neutral\n4 – Satisfied\n5 – Excellent\n\nYou may share your rating and any additional comments here:\n${link}\n\nThank you for choosing Cygnus. We appreciate your time and feedback.\n\nBest regards,\nSupport Team`;
+    const text = `Dear ${ticket.contact_name || "Customer"},\n\nYour ticket ${ticket.ticket_no} has recently been closed. To help us improve our service quality, we kindly request your feedback on the support experience.\n\nReported Issue: ${ticket.problem}\n\nPlease rate your overall satisfaction on a scale of 1 to 5, where:\n1 – Very Dissatisfied\n2 – Dissatisfied\n3 – Neutral\n4 – Satisfied\n5 – Excellent\n\nYou may share your rating and any additional comments here:\n${link}\n\nThank you for choosing Cygnus. We appreciate your time and feedback.\n\nBest regards,\nSupport Team`;
 
     await sendMail({
       to: ticket.email_id,

@@ -7,5 +7,6 @@ declare module "express-session" {
     role: "admin" | "employee";
     displayName: string;
     email: string | null;
+    team: "FMS" | "Field" | null;
   }
 }

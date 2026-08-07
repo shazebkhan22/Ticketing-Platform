@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import type { UserTeam } from "@/types/user";
 
 export interface AuthUser {
   id: number;
@@ -6,6 +7,7 @@ export interface AuthUser {
   role: "admin" | "employee";
   displayName?: string;
   email?: string;
+  team?: UserTeam | null;
 }
 
 export async function login(username: string, password: string): Promise<AuthUser> {

@@ -17,6 +17,7 @@ export const env = {
   sessionSecret: required("SESSION_SECRET"),
   sessionMaxAgeMinutes: Number(process.env.SESSION_MAX_AGE_MINUTES ?? 30),
   frontendOrigin: process.env.FRONTEND_ORIGIN ?? "http://localhost:5173",
+  dnsOrigin: process.env.DNS_ORIGIN ?? "http://cispl.ddns.net:5173",
   // Max simultaneous DB connections this instance's pool will open. pg's own
   // default is 10, which is silently, catastrophically low under real
   // concurrent load — every additional running instance of this app must

@@ -52,6 +52,8 @@ export interface Ticket {
   closedAt: string | null;
   lastRemark?: string;
   rowVersion: number;
+  inInventory: boolean;
+  inventoryPending: boolean;
 }
 
 export interface Remark {
@@ -127,6 +129,7 @@ export interface Employee {
   id: number;
   displayName: string;
   role?: "admin" | "employee";
+  team?: UserTeam | null;
 }
 
 export interface CustomerDirectoryEntry {

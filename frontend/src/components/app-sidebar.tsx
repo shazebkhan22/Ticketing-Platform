@@ -6,7 +6,7 @@ import { NavLink } from "react-router-dom"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
-import { NAV_MAIN, NAV_ADMIN, NAV_SECONDARY } from "@/constants/navigation"
+import { NAV_MAIN, NAV_ADMIN, NAV_INVENTORY, NAV_SECONDARY } from "@/constants/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import {
   Sidebar,
@@ -20,7 +20,13 @@ import {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useAuth()
-  const navMainItems = user?.role === "admin" ? [...NAV_MAIN, ...NAV_ADMIN] : NAV_MAIN
+  const isAdmin = user?.role === "admin"
+  const canSeeInventory = isAdmin || user?.team === "Field"
+  const navMainItems = [
+    ...NAV_MAIN,
+    ...(canSeeInventory ? NAV_INVENTORY : []),
+    ...(isAdmin ? NAV_ADMIN : []),
+  ]
 
   return (
     <Sidebar variant="inset" {...props}>

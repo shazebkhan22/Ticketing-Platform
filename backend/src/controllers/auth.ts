@@ -46,7 +46,7 @@ export async function login(req: Request, res: Response) {
   const { username, password } = parsed.data;
 
   const result = await pool.query(
-    "SELECT id, username, password_hash, role, display_name, email, is_active FROM users WHERE username = $1",
+    "SELECT id, username, password_hash, role, display_name, email, is_active, team FROM users WHERE username = $1",
     [username]
   );
   const user = result.rows[0];
@@ -81,6 +81,7 @@ export async function login(req: Request, res: Response) {
   req.session.role = user.role;
   req.session.displayName = user.display_name;
   req.session.email = user.email;
+  req.session.team = user.team;
 
   req.log.info({ username: user.username, userId: user.id, role: user.role }, "Login succeeded");
 
@@ -90,6 +91,7 @@ export async function login(req: Request, res: Response) {
     role: user.role,
     displayName: user.display_name,
     email: user.email,
+    team: user.team,
   });
 }
 
@@ -105,7 +107,7 @@ export async function getMe(req: Request, res: Response) {
     return res.status(401).json({ error: "Not authenticated" });
   }
   const result = await pool.query(
-    "SELECT id, username, role, display_name, email FROM users WHERE id = $1 AND is_active = true",
+    "SELECT id, username, role, display_name, email, team FROM users WHERE id = $1 AND is_active = true",
     [req.session.userId]
   );
   const user = result.rows[0];
@@ -115,12 +117,14 @@ export async function getMe(req: Request, res: Response) {
     // page load/refresh without needing separate session-invalidation logic.
     return res.status(401).json({ error: "Not authenticated" });
   }
+  req.session.team = user.team;
   res.json({
     id: user.id,
     username: user.username,
     role: user.role,
     displayName: user.display_name,
     email: user.email,
+    team: user.team,
   });
 }
 

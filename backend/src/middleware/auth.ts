@@ -39,6 +39,21 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 /**
+ * Inventory is only for admins and Team Field — Team FMS (and users with no
+ * team set) get no access to the feature at all, regardless of whether
+ * they're otherwise assigned to the ticket in question.
+ */
+export function requireFieldTeamOrAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  if (req.session.role === "admin" || req.session.team === "Field") {
+    return next();
+  }
+  return res.status(403).json({ error: "Inventory is only available to Team Field" });
+}
+
+/**
  * Allows the request through if the logged-in user is an admin, OR is one of
  * the employees a ticket is currently ASSIGNED TO (req.params.srNo) — a
  * ticket can have multiple assignees, all of whom are responsible for

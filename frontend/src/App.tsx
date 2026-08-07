@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
+import { InventoryRoute } from "@/components/InventoryRoute";
 import { SidebarLayout } from "@/components/SidebarLayout";
 import { RealtimeNotifications } from "@/components/RealtimeNotifications";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -106,13 +107,15 @@ function App() {
                   <Route path="/projects/:srNo" element={<ProjectDetailPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/password" element={<PasswordPage />} />
+                  <Route element={<InventoryRoute />}>
+                    <Route path="/inventory" element={<InventoryPage />} />
+                  </Route>
                   <Route element={<AdminRoute />}>
                     <Route path="/projects/new" element={<ProjectFormPage />} />
                     <Route path="/projects/:srNo/edit" element={<ProjectFormPage />} />
                     <Route path="/activity" element={<ActivityLogPage />} />
                     <Route path="/customers" element={<CustomersPage />} />
                     <Route path="/customers/:id" element={<CustomerDetailPage />} />
-                    <Route path="/inventory" element={<InventoryPage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/users" element={<UsersPage />} />

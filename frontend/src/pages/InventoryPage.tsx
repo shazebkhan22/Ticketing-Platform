@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 import { useInventoryList, useUpdateInventory } from "@/hooks/useInventory";
+import { useUpdateTicketStatusForAnyTicket } from "@/hooks/useTickets";
 import { usePaginatedFilters, getTotalPages } from "@/hooks/usePaginatedFilters";
 import type {
   InventoryItem,
@@ -20,7 +22,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Info } from "lucide-react";
+import { CheckCircle2, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +52,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function toFormState(item: InventoryItem): EditFormState {
   return {
@@ -58,16 +70,29 @@ function toFormState(item: InventoryItem): EditFormState {
     repairLocation: item.repairLocation,
     outsourceVendor: item.outsourceVendor ?? "",
     expectedReturnDate: item.expectedReturnDate ?? "",
+    deliveryPerson: item.deliveryPerson ?? "",
   };
 }
 
+// The dispatch workflow is done once an outward date is set — nothing left
+// to update, so the row is locked instead of inviting another edit.
+function isCompleted(item: InventoryItem): boolean {
+  return item.derivedStatus === "Returned to Customer";
+}
+
 export function InventoryPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const { filters, updateFilter, page, pageSize } = usePaginatedFilters(DEFAULT_FILTERS);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [form, setForm] = useState<EditFormState | null>(null);
+  // Set right after a save that newly dispatched the item — offers to close
+  // the ticket in the same flow instead of making the user go find it later.
+  const [closePromptSrNo, setClosePromptSrNo] = useState<number | null>(null);
 
   const { data, isLoading } = useInventoryList(filters);
   const updateMutation = useUpdateInventory();
+  const closeTicketMutation = useUpdateTicketStatusForAnyTicket();
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -92,6 +117,9 @@ export function InventoryPage() {
       if (!f.expectedReturnDate) {
         return "Expected return date is required for outsourced repairs";
       }
+      if (!f.deliveryPerson.trim()) {
+        return "Delivery person is required for outsourced repairs";
+      }
     }
     if (
       f.outwardDate &&
@@ -110,22 +138,42 @@ export function InventoryPage() {
       toast.error(validationError);
       return;
     }
+    const wasDispatched = Boolean(editingItem.outwardDate);
+    const srNo = editingItem.srNo;
     try {
       await updateMutation.mutateAsync({
-        srNo: editingItem.srNo,
+        srNo,
         input: {
           inwardDate: form.inwardDate || undefined,
           outwardDate: form.outwardDate || undefined,
           repairLocation: form.repairLocation,
           outsourceVendor: form.outsourceVendor || undefined,
           expectedReturnDate: form.expectedReturnDate || undefined,
+          deliveryPerson: form.deliveryPerson || undefined,
         },
       });
       toast.success("Inventory updated");
       setEditingItem(null);
       setForm(null);
+      // Only prompt the first time the outward date is set, not on every
+      // subsequent edit to an already-dispatched item.
+      if (!wasDispatched && form.outwardDate) {
+        setClosePromptSrNo(srNo);
+      }
     } catch {
       toast.error("Failed to update inventory");
+    }
+  }
+
+  async function handleCloseTicket() {
+    if (closePromptSrNo === null) return;
+    try {
+      await closeTicketMutation.mutateAsync({ srNo: closePromptSrNo, status: "Closed" });
+      toast.success("Ticket closed");
+    } catch {
+      toast.error("Failed to close ticket — you can still close it from the ticket detail page");
+    } finally {
+      setClosePromptSrNo(null);
     }
   }
 
@@ -134,8 +182,9 @@ export function InventoryPage() {
       <div>
         <h2 className="text-lg font-semibold text-neutral-800">Inventory</h2>
         <p className="text-sm text-neutral-500 max-w-xl">
-          Track inward/outward movement and in-house vs. outsourced repair
-          status for every product that's come in on a ticket.
+          {isAdmin
+            ? "Track inward/outward movement and in-house vs. outsourced repair status for every product added to inventory."
+            : "Track inward/outward movement and in-house vs. outsourced repair status for products on your tickets."}
         </p>
       </div>
 
@@ -189,7 +238,7 @@ export function InventoryPage() {
               ) : items.length === 0 ? (
                 <TableEmptyRow
                   colSpan={10}
-                  message="No products found. Inventory only tracks tickets that have a serial number."
+                  message="No products found. Add a ticket to inventory from its ticket detail page to track it here."
                 />
               ) : (
                 items.map((item) => (
@@ -227,13 +276,27 @@ export function InventoryPage() {
                     {item.outwardDate ? formatDate(item.outwardDate) : "-"}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openEdit(item)}
-                    >
-                      Update
-                    </Button>
+                    {isCompleted(item) ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button size="sm" variant="outline" disabled className="gap-1.5 text-emerald-700">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Completed
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Already dispatched back to the customer — nothing left to update.
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openEdit(item)}
+                      >
+                        Update
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
                 ))
@@ -342,6 +405,26 @@ export function InventoryPage() {
                       placeholder="Not set"
                     />
                   </div>
+                  <div className="col-span-2">
+                    <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-neutral-500">
+                      Delivery Person
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 cursor-help text-primary" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Who's being sent to hand-deliver the product back to the customer.
+                        </TooltipContent>
+                      </Tooltip>
+                    </label>
+                    <Input
+                      value={form.deliveryPerson}
+                      onChange={(e) =>
+                        setForm({ ...form, deliveryPerson: e.target.value })
+                      }
+                      placeholder="e.g. Ramesh Kumar"
+                    />
+                  </div>
                 </div>
               )}
               <div>
@@ -381,6 +464,24 @@ export function InventoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={closePromptSrNo !== null} onOpenChange={(open) => !open && setClosePromptSrNo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close this ticket now?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The product has been marked as dispatched back to the customer. Would you
+              like to close the ticket now, or leave it open and close it later ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Not now</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCloseTicket} disabled={closeTicketMutation.isPending}>
+              {closeTicketMutation.isPending ? "Closing..." : "Close Ticket"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

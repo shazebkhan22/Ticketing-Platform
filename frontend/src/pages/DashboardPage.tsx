@@ -246,8 +246,7 @@ export function DashboardPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Export tickets to Excel?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will download an .xlsx file of every ticket matching your
-              current filters (not just the current page).
+              This will download an .xlsx file of every ticket.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="mb-2">

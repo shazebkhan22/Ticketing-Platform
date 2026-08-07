@@ -13,6 +13,10 @@ import {
   UserCog,
   Clock,
   MessageSquare,
+  Hourglass,
+  Loader,
+  CheckCircle2,
+  TriangleAlert,
 } from "lucide-react";
 import {
   adminFeedbackResponseSchema,
@@ -26,6 +30,7 @@ import {
   useUpdateAdminFeedbackResponse,
   useUpdateTicketStatus,
 } from "@/hooks/useTickets";
+import { useAddToInventory } from "@/hooks/useInventory";
 import type { TicketStatus } from "@/types/ticket";
 import { STATUS_FLOW, PRIORITY_CLASSES, PRIORITY_LABELS } from "@/constants/ticket";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -50,7 +55,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+const STATUS_ICONS: Record<TicketStatus, typeof Clock> = {
+  Pending: Hourglass,
+  "In Progress": Loader,
+  Closed: CheckCircle2,
+};
 
 function Field({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -107,6 +128,7 @@ export function TicketDetailPage() {
   const updateStatus = useUpdateTicketStatus(ticketSrNo);
   const updateAdminFeedbackResponse = useUpdateAdminFeedbackResponse(ticketSrNo);
   const addRemarkMutation = useAddRemark(ticketSrNo);
+  const addToInventoryMutation = useAddToInventory();
 
   const [newRemark, setNewRemark] = useState("");
   const [remarkError, setRemarkError] = useState<string | null>(null);
@@ -115,6 +137,8 @@ export function TicketDetailPage() {
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [callTime, setCallTime] = useState("");
   const [confirmedCallTime, setConfirmedCallTime] = useState("");
+  const [pendingStatus, setPendingStatus] = useState<TicketStatus | null>(null);
+  const [confirmAddToInventoryOpen, setConfirmAddToInventoryOpen] = useState(false);
 
   if (isLoading || !data) {
     return (
@@ -144,9 +168,28 @@ export function TicketDetailPage() {
     toast.success("Remark added");
   }
 
-  async function handleStatusChange(status: TicketStatus) {
-    await updateStatus.mutateAsync(status);
-    toast.success(`Status changed to ${status}`);
+  function requestStatusChange(status: TicketStatus) {
+    if (status === ticket.status) return;
+    if (status === "Closed" && ticket.inventoryPending) {
+      toast.error(
+        "This ticket has a pending inventory item that hasn't been dispatched yet. Complete the outward workflow in Inventory before closing."
+      );
+      return;
+    }
+    setPendingStatus(status);
+  }
+
+  async function confirmStatusChange() {
+    if (!pendingStatus) return;
+    const status = pendingStatus;
+    try {
+      await updateStatus.mutateAsync(status);
+      toast.success(`Status changed to ${status}`);
+    } catch {
+      toast.error("Failed to change status");
+    } finally {
+      setPendingStatus(null);
+    }
   }
 
   async function handleAdminResponseSave() {
@@ -161,6 +204,22 @@ export function TicketDetailPage() {
   }
 
   const engineerName = ticket.assignees.map((a) => a.displayName).join(", ");
+  // Team FMS has no access to inventory at all — only admins and Team Field.
+  // A closed ticket is done — reopen it first if it turns out inventory work
+  // is needed after all.
+  const canAddToInventory =
+    canEdit && (user?.role === "admin" || user?.team === "Field") && ticket.status !== "Closed";
+
+  async function handleAddToInventory() {
+    try {
+      await addToInventoryMutation.mutateAsync(ticket.srNo);
+      toast.success("Added to inventory");
+    } catch {
+      toast.error("Failed to add to inventory");
+    } finally {
+      setConfirmAddToInventoryOpen(false);
+    }
+  }
 
   return (
     <div>
@@ -216,15 +275,56 @@ export function TicketDetailPage() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={pendingStatus !== null} onOpenChange={(open) => !open && setPendingStatus(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingStatus === "Closed"
+                ? "Close this ticket?"
+                : `Change status to ${pendingStatus}?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingStatus === "Closed"
+                ? "This marks the ticket as resolved. If the customer hasn't already been notified (e.g. via the inventory dispatch email), we'll email them now. You can reopen it later if needed."
+                : `This will change the ticket's status from ${ticket.status} to ${pendingStatus}.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmStatusChange} disabled={updateStatus.isPending}>
+              {updateStatus.isPending ? "Saving..." : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmAddToInventoryOpen} onOpenChange={setConfirmAddToInventoryOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Add this ticket to Inventory?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This creates an inventory entry for ticket {ticket.ticketNo} so its inward/outward
+              repair workflow can be tracked. It can't be removed from Inventory once added.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleAddToInventory} disabled={addToInventoryMutation.isPending}>
+              {addToInventoryMutation.isPending ? "Adding..." : "Add to Inventory"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="print:hidden">
         <div className="no-print mb-4">
           <Button onClick={() => navigate("/")}>← Back to dashboard</Button>
         </div>
 
-        <div className="no-print mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="no-print mb-2 flex flex-wrap items-start justify-between">
           <div>
             <h2 className="text-xl font-bold text-neutral-800">Ticket: {ticket.ticketNo}</h2>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {/* <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <StatusBadge ticket={ticket} />
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -240,7 +340,7 @@ export function TicketDetailPage() {
               <Badge variant="secondary" className="rounded-full bg-slate-100 text-slate-700">
                 {ticket.internalTag}
               </Badge>
-            </div>
+            </div> */}
           </div>
           <div className="flex gap-2">
             {ticket.status === "Closed" && (
@@ -299,6 +399,22 @@ export function TicketDetailPage() {
                   <Field label="Call Type" value={ticket.callType} />
                   <Field label="Mode" value={ticket.mode} />
                 </div>
+                {canAddToInventory && (
+                  <div className="no-print mt-4">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => setConfirmAddToInventoryOpen(true)}
+                      disabled={ticket.inInventory || addToInventoryMutation.isPending}
+                    >
+                      {ticket.inInventory
+                        ? "Added to Inventory"
+                        : addToInventoryMutation.isPending
+                        ? "Adding..."
+                        : "Add to Inventory"}
+                    </Button>
+                  </div>
+                )}
               </SectionCard>
             </div>
 
@@ -330,21 +446,49 @@ export function TicketDetailPage() {
               </div>
 
               {canEdit && (
-                <div className="no-print mt-6 flex flex-wrap items-center gap-3">
-                  <span className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-                    Change Status:
+                <div className="no-print mt-6 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+                  <span className="mb-2 block text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                    Change Status
                   </span>
-                  {STATUS_FLOW.map((s, idx) => (
-                    <Button
-                      key={s}
-                      size="sm"
-                      variant={idx === currentStatusIndex ? "secondary" : "default"}
-                      disabled={idx === currentStatusIndex || updateStatus.isPending}
-                      onClick={() => handleStatusChange(s)}
-                    >
-                      {s}
-                    </Button>
-                  ))}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {STATUS_FLOW.map((s, idx) => {
+                      const StatusIcon = STATUS_ICONS[s];
+                      const isCurrent = idx === currentStatusIndex;
+                      const blockedByInventory = s === "Closed" && ticket.inventoryPending;
+                      const button = (
+                        <Button
+                          key={s}
+                          size="sm"
+                          variant={isCurrent ? "secondary" : "outline"}
+                          className="gap-1.5"
+                          disabled={isCurrent || blockedByInventory || updateStatus.isPending}
+                          onClick={() => requestStatusChange(s)}
+                        >
+                          <StatusIcon className="h-3.5 w-3.5" />
+                          {s}
+                        </Button>
+                      );
+                      return blockedByInventory ? (
+                        <Tooltip key={s}>
+                          <TooltipTrigger asChild>{button}</TooltipTrigger>
+                          <TooltipContent>
+                            Pending inventory dispatch — complete the outward workflow in Inventory first.
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        button
+                      );
+                    })}
+                  </div>
+                  {ticket.inventoryPending && ticket.status !== "Closed" && (
+                    <div className="mt-3 flex items-start gap-2 text-xs text-amber-700">
+                      <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span>
+                        This ticket has a product in Inventory that hasn't been dispatched back to the
+                        customer yet — it can't be closed until that's done.
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </SectionCard>

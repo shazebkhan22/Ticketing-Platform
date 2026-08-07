@@ -22,11 +22,14 @@ export const NAV_MAIN = [
 export const NAV_ADMIN = [
   { title: "Activity Log", url: "/activity", icon: <HistoryIcon /> },
   { title: "Customers", url: "/customers", icon: <BuildingIcon /> },
-  {title: "Inventory", url: "/inventory", icon: <ListChecksIcon />},
   { title: "Analytics", url: "/analytics", icon: <LayoutDashboardIcon /> },
   { title: "Employees", url: "/users", icon: <UsersIcon /> },
   { title: "Settings", url: "/settings", icon: <SettingsIcon /> },
 ];
+
+// Shown to admins and Team Field only — see AppSidebar, which filters by
+// user.role/user.team. Team FMS has no access to inventory at all.
+export const NAV_INVENTORY = [{ title: "Inventory", url: "/inventory", icon: <ListChecksIcon /> }];
 
 export const NAV_SECONDARY = [
 ];

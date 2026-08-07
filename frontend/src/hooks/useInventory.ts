@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchInventory, updateInventory } from "@/api/inventory";
+import { addToInventory, fetchInventory, updateInventory } from "@/api/inventory";
+import { ticketKeys } from "@/hooks/useTickets";
 import type { InventoryFilters, InventoryUpdateInput } from "@/types/inventory";
 
 export const inventoryKeys = {
@@ -19,8 +20,20 @@ export function useUpdateInventory() {
   return useMutation({
     mutationFn: ({ srNo, input }: { srNo: number; input: InventoryUpdateInput }) =>
       updateInventory(srNo, input),
-    onSuccess: () => {
+    onSuccess: (_data, { srNo }) => {
       queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
+      queryClient.invalidateQueries({ queryKey: ticketKeys.detail(srNo) });
+    },
+  });
+}
+
+export function useAddToInventory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (srNo: number) => addToInventory(srNo),
+    onSuccess: (_data, srNo) => {
+      queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
+      queryClient.invalidateQueries({ queryKey: ticketKeys.detail(srNo) });
     },
   });
 }

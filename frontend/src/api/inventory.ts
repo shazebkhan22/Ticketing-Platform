@@ -20,3 +20,8 @@ export async function updateInventory(
   const { data } = await apiClient.put<InventoryUpdateResponse>(`/inventory/${srNo}`, input);
   return data;
 }
+
+export async function addToInventory(srNo: number): Promise<InventoryUpdateResponse> {
+  const { data } = await apiClient.post<InventoryUpdateResponse>(`/inventory/${srNo}`);
+  return data;
+}

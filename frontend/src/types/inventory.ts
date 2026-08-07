@@ -13,6 +13,7 @@ export interface InventoryItem {
   repairLocation: RepairLocation;
   outsourceVendor: string | null;
   expectedReturnDate: string | null;
+  deliveryPerson: string | null;
   derivedStatus: "Pending Inward" | "In-House" | "Outsourced" | "Returned to Customer";
 }
 
@@ -37,6 +38,7 @@ export interface InventoryUpdateInput {
   repairLocation?: RepairLocation;
   outsourceVendor?: string;
   expectedReturnDate?: string;
+  deliveryPerson?: string;
 }
 
 export interface InventoryUpdateResponse {
@@ -46,6 +48,7 @@ export interface InventoryUpdateResponse {
   repairLocation: RepairLocation;
   outsourceVendor: string | null;
   expectedReturnDate: string | null;
+  deliveryPerson: string | null;
 }
 
 export interface EditFormState {
@@ -54,4 +57,5 @@ export interface EditFormState {
   repairLocation: RepairLocation;
   outsourceVendor: string;
   expectedReturnDate: string;
+  deliveryPerson: string;
 }
