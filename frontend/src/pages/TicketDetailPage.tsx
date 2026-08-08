@@ -500,7 +500,7 @@ export function TicketDetailPage() {
             <h2 className="text-xl font-bold text-neutral-800">Ticket: {ticket.ticketNo}</h2>
           </div>
           <div className="flex gap-2">
-            {ticket.status === "Closed" && (
+            {ticket.status === "Closed" && ticket.callType !== "Routine Checks" && (
               <Button
                 variant="outline"
                 onClick={() => {

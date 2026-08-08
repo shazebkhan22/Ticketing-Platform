@@ -169,7 +169,7 @@ export function DashboardPage() {
 
   return (
     <div>
-      <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-2">
+      <div className="no-print mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-bold text-neutral-800">Dashboard</h2>
         <div className="flex flex-wrap gap-2">
           {isAdmin && (

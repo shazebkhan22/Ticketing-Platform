@@ -4,6 +4,7 @@ import { pool } from "../db/pool";
 import { REPAIR_LOCATIONS } from "../types/ticket";
 import { sendMail } from "../utils/mailer";
 import { renderEmailHtml } from "../utils/emailTemplate";
+import { logActivity } from "../utils/activityLog";
 
 // Quantity is derived from the ticket's comma-separated serial_number field
 // rather than stored on ticket_inventory — "xyz,abc" means 2 units came in
@@ -124,7 +125,7 @@ export async function addToInventory(req: Request, res: Response) {
   const srNo = parseInt(req.params.srNo, 10);
 
   const ticketResult = await pool.query(
-    "SELECT sr_no, status, call_type FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
+    "SELECT sr_no, ticket_no, status, call_type FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
     [srNo]
   );
   if (ticketResult.rows.length === 0) {
@@ -149,6 +150,19 @@ export async function addToInventory(req: Request, res: Response) {
   const row =
     result.rows[0] ??
     (await pool.query("SELECT * FROM ticket_inventory WHERE ticket_sr_no = $1", [srNo])).rows[0];
+
+  // Only log on the actual first insert — re-clicking "Add to Inventory" on
+  // an already-added ticket hits the ON CONFLICT DO NOTHING branch and
+  // shouldn't create a duplicate log entry.
+  if (result.rows[0]) {
+    await logActivity({
+      actorUserId: req.session.userId,
+      actorName: req.session.username ?? "Unknown",
+      action: "Added to Inward/Outward",
+      ticketSrNo: srNo,
+      ticketNo: ticketResult.rows[0].ticket_no,
+    });
+  }
 
   res.json({
     srNo: row.ticket_sr_no,
@@ -245,6 +259,19 @@ export async function upsertInventory(req: Request, res: Response) {
       d.deliveryPerson || null,
     ]
   );
+
+  // "Dispatched" gets its own label the first time an outward date lands
+  // (mirrors the shouldNotify distinction just above) — otherwise it's a
+  // regular inward/repair-detail update.
+  const justDispatched = Boolean(newOutwardDate && !existing?.outward_date);
+  await logActivity({
+    actorUserId: req.session.userId,
+    actorName: req.session.username ?? "Unknown",
+    action: justDispatched ? "Dispatched product to customer" : "Updated Inward/Outward",
+    ticketSrNo: srNo,
+    ticketNo: ticket.ticket_no,
+    details: `Inward: ${d.inwardDate || "-"}, Outward: ${d.outwardDate || "-"}, Location: ${d.repairLocation ?? "In-House"}`,
+  });
 
   let row = result.rows[0];
   if (shouldNotify && ticket.email_id) {

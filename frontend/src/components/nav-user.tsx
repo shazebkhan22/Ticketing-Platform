@@ -1,10 +1,7 @@
-"use client"
+"use client";
 
-import { useNavigate } from "react-router-dom"
-import {
-  Avatar,
-  AvatarFallback,
-} from "@/components/ui/avatar"
+import { useNavigate } from "react-router-dom";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,28 +9,28 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, KeyRoundIcon, LogOutIcon, UserIcon } from "lucide-react"
-import { useAuth } from "@/hooks/useAuth"
+} from "@/components/ui/sidebar";
+import { ChevronsUpDownIcon, KeyRoundIcon, LogOutIcon, SettingsIcon, UserIcon } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export function NavUser() {
-  const { isMobile } = useSidebar()
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
+  const { isMobile } = useSidebar();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
-  if (!user) return null
+  if (!user) return null;
 
-  const initials = user.username.slice(0, 2).toUpperCase()
+  const initials = user.username.slice(0, 2).toUpperCase();
 
   async function handleLogout() {
-    await logout()
-    navigate("/login")
+    await logout();
+    navigate("/login");
   }
 
   return (
@@ -67,9 +64,7 @@ export function NavUser() {
                   <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">
-                    {user.displayName ?? user.username}
-                  </span>
+                  <span className="truncate font-medium">{user.displayName ?? user.username}</span>
                   <span className="truncate text-xs capitalize">{user.role}</span>
                 </div>
               </div>
@@ -84,6 +79,15 @@ export function NavUser() {
               <KeyRoundIcon />
               Change Password
             </DropdownMenuItem>
+            {user.role === "admin" && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/settings")}>
+                  <SettingsIcon />
+                  Settings
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} variant="destructive">
               <LogOutIcon />
@@ -93,5 +97,5 @@ export function NavUser() {
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }

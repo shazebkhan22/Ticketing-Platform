@@ -4,6 +4,7 @@ import { requireAuth, requireAdmin, requireTicketAssigneeOrAdmin, validateSrNoPa
 import {
   listTickets,
   getSummary,
+  getRoutineChecksToday,
   getTicket,
   createTicket,
   updateTicket,
@@ -27,6 +28,7 @@ ticketsRouter.use(requireAuth);
 // Read routes: any authenticated user (admin or employee) can see all tickets.
 ticketsRouter.get("/summary", getSummary);
 ticketsRouter.get("/analytics", getAnalytics);
+ticketsRouter.get("/routine-checks/today", requireAdmin, getRoutineChecksToday);
 
 // Excel export/import — declared before "/:srNo" so they aren't swallowed by
 // that wildcard param route. Export honors the same filters as the list

@@ -3,6 +3,7 @@ import type {
   Analytics,
   ImportResult,
   MetaOptions,
+  RoutineChecksToday,
   Summary,
   Ticket,
   TicketDetail,
@@ -54,6 +55,11 @@ export async function fetchSummary(assigneeUserId?: number): Promise<Summary> {
   return data;
 }
 
+export async function fetchRoutineChecksToday(): Promise<RoutineChecksToday> {
+  const { data } = await apiClient.get<RoutineChecksToday>("/tickets/routine-checks/today");
+  return data;
+}
+
 export async function fetchTickets(filters: TicketFilters): Promise<TicketListResponse> {
   const params: Record<string, string> = {};
   Object.entries(filters).forEach(([key, value]) => {
@@ -100,11 +106,7 @@ export async function deleteTicket(srNo: number): Promise<void> {
   await apiClient.delete(`/tickets/${srNo}`);
 }
 
-export async function addRemark(
-  srNo: number,
-  body: string,
-  remarkDate?: string
-): Promise<void> {
+export async function addRemark(srNo: number, body: string, remarkDate?: string): Promise<void> {
   await apiClient.post(`/tickets/${srNo}/remarks`, { body, remarkDate });
 }
 

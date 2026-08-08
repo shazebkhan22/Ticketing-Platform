@@ -5,9 +5,9 @@ import {
   PlusCircleIcon,
   HistoryIcon,
   BuildingIcon,
-  SettingsIcon,
   UsersIcon,
   FolderKanbanIcon,
+  ClipboardCheckIcon,
 } from "lucide-react";
 
 export const NAV_MAIN = [
@@ -19,12 +19,14 @@ export const NAV_MAIN = [
 ];
 
 // Shown only to admins — see AppSidebar, which filters by user.role.
+// Settings lives in the footer user dropdown (see nav-user.tsx) instead of
+// here, not duplicated in both places.
 export const NAV_ADMIN = [
   { title: "Activity Log", url: "/activity", icon: <HistoryIcon /> },
   { title: "Customers", url: "/customers", icon: <BuildingIcon /> },
   { title: "Analytics", url: "/analytics", icon: <LayoutDashboardIcon /> },
+  { title: "Routine Check", url: "/routine-checks", icon: <ClipboardCheckIcon /> },
   { title: "Employees", url: "/users", icon: <UsersIcon /> },
-  { title: "Settings", url: "/settings", icon: <SettingsIcon /> },
 ];
 
 // Shown to admins and Team Field only — see AppSidebar, which filters by

@@ -51,12 +51,13 @@ const InventoryPage = lazy(() =>
 const AnalyticsPage = lazy(() =>
   import("@/pages/AnalyticsPage").then((m) => ({ default: m.AnalyticsPage }))
 );
+const RoutineChecksStatusPage = lazy(() =>
+  import("@/pages/RoutineChecksStatusPage").then((m) => ({ default: m.RoutineChecksStatusPage }))
+);
 const SettingsPage = lazy(() =>
   import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage }))
 );
-const UsersPage = lazy(() =>
-  import("@/pages/UsersPage").then((m) => ({ default: m.UsersPage }))
-);
+const UsersPage = lazy(() => import("@/pages/UsersPage").then((m) => ({ default: m.UsersPage })));
 const PublicFeedbackPage = lazy(() =>
   import("@/pages/PublicFeedbackPage").then((m) => ({ default: m.PublicFeedbackPage }))
 );
@@ -117,6 +118,7 @@ function App() {
                     <Route path="/customers" element={<CustomersPage />} />
                     <Route path="/customers/:id" element={<CustomerDetailPage />} />
                     <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/routine-checks" element={<RoutineChecksStatusPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/users" element={<UsersPage />} />
                   </Route>

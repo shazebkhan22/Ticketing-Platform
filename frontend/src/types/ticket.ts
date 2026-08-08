@@ -94,6 +94,20 @@ export interface Summary {
   overdue: number;
 }
 
+export interface RoutineCheckEmployeeStatus {
+  userId: number;
+  displayName: string;
+  taken: boolean;
+  ticketSrNo: number | null;
+  ticketNo: string | null;
+  submittedAt: string | null;
+}
+
+export interface RoutineChecksToday {
+  date: string;
+  employees: RoutineCheckEmployeeStatus[];
+}
+
 export interface AnalyticsMonthlyPoint {
   month: string;
   created: number;

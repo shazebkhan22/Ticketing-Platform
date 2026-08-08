@@ -4,6 +4,7 @@ import { pool } from "../db/pool";
 export async function listActivity(req: Request, res: Response) {
   const {
     ticketSrNo,
+    projectSrNo,
     actorUserId,
     action,
     dateFrom,
@@ -18,6 +19,10 @@ export async function listActivity(req: Request, res: Response) {
   if (ticketSrNo) {
     params.push(ticketSrNo);
     conditions.push(`al.ticket_sr_no = $${params.length}`);
+  }
+  if (projectSrNo) {
+    params.push(projectSrNo);
+    conditions.push(`al.project_sr_no = $${params.length}`);
   }
   if (actorUserId) {
     params.push(actorUserId);
@@ -46,7 +51,7 @@ export async function listActivity(req: Request, res: Response) {
   // back to that snapshot only if the user's since been deleted.
   const query = `
     SELECT al.id, al.actor_user_id, COALESCE(u.display_name, al.actor_name) AS actor_name,
-      al.action, al.ticket_sr_no, al.ticket_no, al.details, al.created_at
+      al.action, al.ticket_sr_no, al.ticket_no, al.project_sr_no, al.project_no, al.details, al.created_at
     FROM activity_log al
     LEFT JOIN users u ON u.id = al.actor_user_id
     ${whereClause}
@@ -68,6 +73,8 @@ export async function listActivity(req: Request, res: Response) {
       action: r.action,
       ticketSrNo: r.ticket_sr_no,
       ticketNo: r.ticket_no,
+      projectSrNo: r.project_sr_no,
+      projectNo: r.project_no,
       details: r.details,
       createdAt: r.created_at,
     })),

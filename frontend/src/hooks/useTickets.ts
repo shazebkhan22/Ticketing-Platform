@@ -7,6 +7,7 @@ import {
   exportTickets,
   fetchAnalytics,
   fetchMetaOptions,
+  fetchRoutineChecksToday,
   fetchSummary,
   fetchTicket,
   fetchTickets,
@@ -19,17 +20,26 @@ import type { TicketDetail, TicketFilters, TicketFormInput } from "@/types/ticke
 
 export const ticketKeys = {
   all: ["tickets"] as const,
-  summary: (assigneeUserId?: number) => [...ticketKeys.all, "summary", assigneeUserId ?? null] as const,
+  summary: (assigneeUserId?: number) =>
+    [...ticketKeys.all, "summary", assigneeUserId ?? null] as const,
   list: (filters: TicketFilters) => [...ticketKeys.all, "list", filters] as const,
   detail: (srNo: number) => [...ticketKeys.all, "detail", srNo] as const,
   meta: () => ["meta", "options"] as const,
   analytics: () => [...ticketKeys.all, "analytics"] as const,
+  routineChecksToday: () => [...ticketKeys.all, "routine-checks", "today"] as const,
 };
 
 export function useSummary(assigneeUserId?: number) {
   return useQuery({
     queryKey: ticketKeys.summary(assigneeUserId),
     queryFn: () => fetchSummary(assigneeUserId),
+  });
+}
+
+export function useRoutineChecksToday() {
+  return useQuery({
+    queryKey: ticketKeys.routineChecksToday(),
+    queryFn: fetchRoutineChecksToday,
   });
 }
 
@@ -90,7 +100,9 @@ export function useUpdateTicket(srNo: number) {
       const cached = queryClient.getQueryData<TicketDetail>(ticketKeys.detail(srNo));
       const rowVersion = cached?.ticket.rowVersion;
       if (rowVersion === undefined) {
-        throw new Error("Cannot update: current ticket version is unknown. Please refresh and try again.");
+        throw new Error(
+          "Cannot update: current ticket version is unknown. Please refresh and try again."
+        );
       }
       return updateTicket(srNo, input, rowVersion);
     },
@@ -112,7 +124,8 @@ export function useUpdateTicketStatus(srNo: number) {
 export function useUpdateTicketStatusForAnyTicket() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ srNo, status }: { srNo: number; status: string }) => updateTicketStatus(srNo, status),
+    mutationFn: ({ srNo, status }: { srNo: number; status: string }) =>
+      updateTicketStatus(srNo, status),
     onSuccess: (_data, { srNo }) => {
       queryClient.invalidateQueries({ queryKey: ticketKeys.all });
       queryClient.invalidateQueries({ queryKey: ticketKeys.detail(srNo) });

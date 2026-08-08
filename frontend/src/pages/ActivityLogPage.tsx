@@ -1,9 +1,6 @@
 import { Link } from "react-router-dom";
 import { useActivity } from "@/hooks/useActivity";
-import {
-  usePaginatedFilters,
-  getTotalPages,
-} from "@/hooks/usePaginatedFilters";
+import { usePaginatedFilters, getTotalPages } from "@/hooks/usePaginatedFilters";
 import { formatDateTime } from "@/lib/ticket-utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { PaginationFooter } from "@/components/PaginationFooter";
@@ -21,15 +18,12 @@ import type { ActivityFilters } from "@/types/activity";
 const DEFAULT_FILTERS: ActivityFilters = { page: 1, pageSize: 12 };
 
 export function ActivityLogPage() {
-  const { filters, updateFilter, page, pageSize } =
-    usePaginatedFilters(DEFAULT_FILTERS);
+  const { filters, updateFilter, page, pageSize } = usePaginatedFilters(DEFAULT_FILTERS);
   const { data, isLoading } = useActivity(filters);
 
   const entries = data?.entries ?? [];
   const total = data?.total ?? 0;
   const totalPages = getTotalPages(total, pageSize);
-
-  console.log(entries);
 
   return (
     <div className="space-y-4">
@@ -45,10 +39,10 @@ export function ActivityLogPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-48">Time</TableHead>
-                <TableHead className="w-32">Person</TableHead>
-                <TableHead className="w-32">Ticket</TableHead>
-                <TableHead className="w-60">Action</TableHead>
+                <TableHead className="w-52">Time</TableHead>
+                <TableHead className="w-48">Person</TableHead>
+                <TableHead className="w-40">Reference</TableHead>
+                <TableHead className="w-24">Action</TableHead>
                 <TableHead>Details</TableHead>
               </TableRow>
             </TableHeader>
@@ -56,10 +50,7 @@ export function ActivityLogPage() {
               {isLoading ? (
                 <TableSkeletonRows colSpan={5} rows={8} />
               ) : entries.length === 0 ? (
-                <TableEmptyRow
-                  colSpan={5}
-                  message="No activity recorded yet."
-                />
+                <TableEmptyRow colSpan={5} message="No activity recorded yet." />
               ) : (
                 entries.map((entry) => (
                   <TableRow key={entry.id}>
@@ -77,13 +68,18 @@ export function ActivityLogPage() {
                         >
                           {entry.ticketNo}
                         </Link>
+                      ) : entry.projectSrNo ? (
+                        <Link
+                          to={`/projects/${entry.projectSrNo}`}
+                          className="text-blue-800 hover:underline font-medium"
+                        >
+                          {entry.projectNo}
+                        </Link>
                       ) : (
-                        (entry.ticketNo ?? "—")
+                        (entry.ticketNo ?? entry.projectNo ?? "—")
                       )}
                     </TableCell>
-                    <TableCell className="py-2 text-sm">
-                      {entry.action}
-                    </TableCell>
+                    <TableCell className="py-2 text-sm">{entry.action}</TableCell>
                     <TableCell className="py-2 max-w-md truncate text-sm text-neutral-500">
                       {entry.details ?? "—"}
                     </TableCell>

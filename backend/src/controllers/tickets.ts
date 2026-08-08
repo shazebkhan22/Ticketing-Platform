@@ -290,6 +290,42 @@ export async function getSummary(req: Request, res: Response) {
   });
 }
 
+// Admin-only roster of every Team FMS employee and whether they've filed
+// today's Routine Checks report yet — Routine Checks tickets are always
+// self-assigned to the submitting engineer (see createTicket), so
+// owner_user_id + ticket_date = today is enough to tell "taken" from "not
+// taken" without a join through ticket_assignees.
+export async function getRoutineChecksToday(_req: Request, res: Response) {
+  const result = await pool.query(
+    `SELECT u.id, u.display_name,
+       t.sr_no, t.ticket_no, t.created_at
+     FROM users u
+     LEFT JOIN LATERAL (
+       SELECT sr_no, ticket_no, created_at
+       FROM tickets
+       WHERE owner_user_id = u.id
+         AND call_type = 'Routine Checks'
+         AND ticket_date = CURRENT_DATE
+         AND deleted_at IS NULL
+       ORDER BY created_at DESC
+       LIMIT 1
+     ) t ON true
+     WHERE u.team = 'FMS' AND u.is_active = true
+     ORDER BY u.display_name`
+  );
+  res.json({
+    date: new Date().toISOString().slice(0, 10),
+    employees: result.rows.map((r) => ({
+      userId: r.id,
+      displayName: r.display_name,
+      taken: r.sr_no !== null,
+      ticketSrNo: r.sr_no,
+      ticketNo: r.ticket_no,
+      submittedAt: r.created_at,
+    })),
+  });
+}
+
 export async function getTicket(req: Request, res: Response) {
   const srNo = parseInt(req.params.srNo, 10);
   const result = await pool.query(
@@ -394,6 +430,26 @@ export async function createTicket(req: Request, res: Response) {
   // file one, same gating rationale as Inventory being Field-only.
   if (isRoutineChecks && req.session.role !== "admin" && req.session.team !== "FMS") {
     return res.status(403).json({ error: "Routine Checks is only available to Team FMS" });
+  }
+
+  // One report per engineer per day — mirrors the "taken/pending" roster on
+  // the Routine Checks admin page (getRoutineChecksToday), which reads the
+  // same owner_user_id + call_type + ticket_date = today combination to
+  // decide whether someone's already filed. Checked against CURRENT_DATE
+  // rather than the submitted ticketDate so it can't be bypassed by editing
+  // that field in the request body.
+  if (isRoutineChecks) {
+    const existing = await pool.query(
+      `SELECT 1 FROM tickets
+       WHERE owner_user_id = $1 AND call_type = 'Routine Checks'
+         AND ticket_date = CURRENT_DATE AND deleted_at IS NULL`,
+      [req.session.userId]
+    );
+    if (existing.rows.length > 0) {
+      return res
+        .status(400)
+        .json({ error: "You've already filed today's Routine Checks report." });
+    }
   }
 
   // Routine Checks tickets skip the assignee picker entirely and are always
