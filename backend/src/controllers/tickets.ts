@@ -422,6 +422,16 @@ export async function createTicket(req: Request, res: Response) {
     req.session.userId
   );
 
+  if (ticket.email_id) {
+    const text = `Dear ${ticket.contact_name || "Customer"},\n\nGreetings from the Cygnus Support Team.\n\nThis is to confirm that we have received your request and a support ticket has been created for the same.\n\nCase Reference Number: ${ticket.ticket_no}\nReported Issue: ${ticket.problem}\n\nOur team will review the issue and get in touch with you shortly. You may reference the case number above for any follow-up.\n\nBest regards,\nSupport Team`;
+    await sendMail({
+      to: ticket.email_id,
+      subject: `Ticket Created — ${ticket.ticket_no}`,
+      text,
+      html: renderEmailHtml(text),
+    });
+  }
+
   res.status(201).json(rowToTicket(created.rows[0]));
 }
 
