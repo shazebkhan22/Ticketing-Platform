@@ -1,6 +1,13 @@
-import type { TicketPriority, TicketStatus } from "@/types/ticket";
+import { Hourglass, Loader, CheckCircle2, type LucideIcon } from "lucide-react";
+import type { RoutineCheckSection, TicketPriority, TicketStatus } from "@/types/ticket";
 
 export const STATUS_FLOW: TicketStatus[] = ["Pending", "In Progress", "Closed"];
+
+export const STATUS_ICONS: Record<TicketStatus, LucideIcon> = {
+  Pending: Hourglass,
+  "In Progress": Loader,
+  Closed: CheckCircle2,
+};
 
 // Mirrors backend/src/utils/statusTransitions.ts — Pending -> In Progress ->
 // Closed, with reopen only from Closed back to Pending. Kept in sync so the
@@ -38,13 +45,30 @@ export const PRIORITY_LABELS: Record<TicketPriority, string> = {
   P4: "Low priority",
 };
 
-// Inventory only tracks tickets that have a serial number (see InventoryPage's
-// "Inventory only tracks tickets that have a serial number" empty state) —
-// these two fields are the ones that gate whether a ticket shows up there.
-const INVENTORY_VISIBILITY_HINT =
-  "Leaving this part empty means it won't show up on the Inventory page.";
-
-export const TICKET_FIELD_TOOLTIPS = {
-  Model: INVENTORY_VISIBILITY_HINT,
-  "Serial Number(s)": INVENTORY_VISIBILITY_HINT,
-} as const;
+// Fixed checklist for the Routine Checks call type — mirrors
+// backend/src/types/ticket.ts ROUTINE_CHECK_TASKS. Not admin-configurable
+// (see the call-type decision made when this feature was added).
+export const ROUTINE_CHECK_TASKS: {
+  section: RoutineCheckSection;
+  task: string;
+  detail?: string;
+}[] = [
+  { section: "Routine Checks", task: "Server Health Check" },
+  { section: "Routine Checks", task: "Disk Space Monitoring" },
+  { section: "Routine Checks", task: "Backup Verification" },
+  { section: "Routine Checks", task: "Antivirus / Endpoint Status" },
+  { section: "Routine Checks", task: "Network Device Health" },
+  { section: "Routine Checks", task: "Email System Functionality" },
+  { section: "Routine Checks", task: "Storage" },
+  {
+    section: "System Updates & Patch Management",
+    task: "Windows Servers",
+    detail: "Security Updates",
+  },
+  { section: "System Updates & Patch Management", task: "Linux Servers", detail: "Kernel Update" },
+  {
+    section: "System Updates & Patch Management",
+    task: "Network Switches",
+    detail: "Firmware Check",
+  },
+];

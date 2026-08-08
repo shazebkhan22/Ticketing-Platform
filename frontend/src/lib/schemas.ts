@@ -22,6 +22,15 @@ export const resetPasswordSchema = z
   });
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 
+export const routineCheckItemSchema = z.object({
+  section: z.enum(["Routine Checks", "System Updates & Patch Management"]),
+  task: z.string().min(1),
+  detail: z.string().optional(),
+  status: z.enum(["Completed", "N/A"]),
+  note: z.string().optional(),
+});
+export type RoutineCheckItemValues = z.infer<typeof routineCheckItemSchema>;
+
 export const ticketFormSchema = z
   .object({
     ticketDate: z.string().min(1, "Required"),
@@ -34,17 +43,44 @@ export const ticketFormSchema = z
     model: z.string().optional(),
     serialNumber: z.string().optional(),
     problem: z.string().min(1, "Required"),
-    accountManagerId: z.number().int().positive("Required"),
-    assignedBy: z.string().min(1, "Required"),
+    // Required for every call type except Routine Checks — see the
+    // superRefine below, which mirrors backend/src/controllers/tickets.ts.
+    accountManagerId: z.number().int().positive().optional(),
+    assignedBy: z.string().optional(),
     callType: z.string().min(1, "Required"),
-    assigneeUserIds: z.array(z.number().int().positive()).min(1, "Select at least one employee"),
-    priority: z.string().min(1, "Required"),
+    assigneeUserIds: z.array(z.number().int().positive()).optional(),
+    priority: z.string().optional(),
     deadlineDate: z.string().optional(),
     internalTag: z.string().optional(),
+    routineChecks: z.array(routineCheckItemSchema).optional(),
   })
   .refine((data) => !data.deadlineDate || data.deadlineDate >= data.ticketDate, {
     message: "Deadline cannot be before the ticket date",
     path: ["deadlineDate"],
+  })
+  .superRefine((data, ctx) => {
+    if (data.callType === "Routine Checks") {
+      if (!data.routineChecks || data.routineChecks.length === 0) {
+        ctx.addIssue({ code: "custom", path: ["routineChecks"], message: "Checklist is required" });
+      }
+    } else {
+      if (!data.accountManagerId) {
+        ctx.addIssue({ code: "custom", path: ["accountManagerId"], message: "Required" });
+      }
+      if (!data.assignedBy?.trim()) {
+        ctx.addIssue({ code: "custom", path: ["assignedBy"], message: "Required" });
+      }
+      if (!data.assigneeUserIds || data.assigneeUserIds.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["assigneeUserIds"],
+          message: "Select at least one employee",
+        });
+      }
+      if (!data.priority?.trim()) {
+        ctx.addIssue({ code: "custom", path: ["priority"], message: "Required" });
+      }
+    }
   });
 export type TicketFormValues = z.infer<typeof ticketFormSchema>;
 

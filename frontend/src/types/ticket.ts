@@ -1,5 +1,6 @@
 import type { ProjectTimeUnit } from "@/types/project";
 import type { UserTeam } from "@/types/user";
+import type { InventoryRepairFields } from "@/types/inventory";
 
 export type TicketMode = "Whatsapp" | "Call" | "Mail" | "Verbally";
 export type CallType =
@@ -12,10 +13,24 @@ export type CallType =
   | "Project"
   | "Call"
   | "Chargeable"
-  | "Non-Chargeable";
+  | "Non-Chargeable"
+  | "Routine Checks";
 export type TicketStatus = "Pending" | "In Progress" | "Closed";
 export type InternalTag = "Internal" | "External";
 export type TicketPriority = "P1" | "P2" | "P3" | "P4";
+
+// Fixed checklist for the Routine Checks call type — mirrors
+// backend/src/types/ticket.ts ROUTINE_CHECK_TASKS/ROUTINE_CHECK_STATUSES.
+export type RoutineCheckStatus = "Completed" | "N/A";
+export type RoutineCheckSection = "Routine Checks" | "System Updates & Patch Management";
+
+export interface RoutineCheckItem {
+  section: RoutineCheckSection;
+  task: string;
+  detail?: string;
+  status: RoutineCheckStatus;
+  note?: string;
+}
 
 export interface Ticket {
   srNo: number;
@@ -47,6 +62,7 @@ export interface Ticket {
   adminFeedbackRespondedAt: string | null;
   adminFeedbackRespondedBy: string | null;
   internalTag: InternalTag;
+  routineChecks: RoutineCheckItem[];
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
@@ -54,6 +70,7 @@ export interface Ticket {
   rowVersion: number;
   inInventory: boolean;
   inventoryPending: boolean;
+  inventory: InventoryRepairFields | null;
 }
 
 export interface Remark {
@@ -208,11 +225,12 @@ export interface TicketFormInput {
   model?: string;
   serialNumber?: string;
   problem: string;
-  accountManagerId: number;
-  assignedBy: string;
+  accountManagerId?: number;
+  assignedBy?: string;
   callType: CallType;
-  assigneeUserIds: number[];
+  assigneeUserIds?: number[];
   priority?: TicketPriority;
   deadlineDate?: string;
   internalTag?: InternalTag;
+  routineChecks?: RoutineCheckItem[];
 }

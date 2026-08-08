@@ -15,7 +15,7 @@ import {
   DATE_TOOLTIPS,
 } from "@/constants/inventory";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { CheckCircle2, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -145,7 +145,7 @@ export function InventoryPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-neutral-800">Inventory</h2>
+        <h2 className="text-lg font-semibold text-neutral-800">Inward/Outward</h2>
         <p className="text-sm text-neutral-500 max-w-xl">
           {isAdmin
             ? "Track inward/outward movement and in-house vs. outsourced repair status for every product added to inventory."
@@ -239,7 +239,6 @@ export function InventoryPage() {
                               disabled
                               className="gap-1.5 text-emerald-700"
                             >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
                               Completed
                             </Button>
                           </TooltipTrigger>

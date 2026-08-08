@@ -4,7 +4,7 @@ export type DateTypes = "Inward Date" | "Outward Date" | "Expected Return Date";
 // The inward/outward repair-workflow fields, shared by every shape below —
 // defined once so adding/renaming a field (e.g. deliveryPerson) only ever
 // touches this one place instead of four copy-pasted interfaces.
-interface InventoryRepairFields {
+export interface InventoryRepairFields {
   inwardDate: string | null;
   outwardDate: string | null;
   repairLocation: RepairLocation;

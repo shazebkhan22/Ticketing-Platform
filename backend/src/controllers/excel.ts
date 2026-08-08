@@ -101,7 +101,11 @@ export async function exportTickets(req: Request, res: Response) {
     overdue,
   } = req.query as Record<string, string>;
 
-  const conditions: string[] = ["t.deleted_at IS NULL"];
+  // Routine Checks tickets are the FMS daily checklist report, not bulk
+  // customer ticket data — they don't fit the export/import column shape
+  // (no account manager/assigned by/priority/deadline) so they're kept out
+  // of both directions entirely, same call as excluding them from Inventory.
+  const conditions: string[] = ["t.deleted_at IS NULL", "t.call_type != 'Routine Checks'"];
   const params: any[] = [];
 
   if (status) {
@@ -279,9 +283,12 @@ export async function downloadImportTemplate(_req: Request, res: Response) {
     { header: "Assigned To (employees)", key: "employees", width: 22 },
   ];
   refSheet.getRow(1).font = { bold: true };
+  // Routine Checks isn't importable (see importTickets) — leave it off the
+  // reference list so it doesn't look like a valid Call Type to type in.
+  const importableCallTypes = CALL_TYPES.filter((c) => c !== "Routine Checks");
   const maxRows = Math.max(
     TICKET_MODES.length,
-    CALL_TYPES.length,
+    importableCallTypes.length,
     TICKET_STATUSES.length,
     TICKET_PRIORITIES.length,
     INTERNAL_TAGS.length,
@@ -290,7 +297,7 @@ export async function downloadImportTemplate(_req: Request, res: Response) {
   for (let i = 0; i < maxRows; i++) {
     refSheet.addRow({
       modes: TICKET_MODES[i] ?? "",
-      callTypes: CALL_TYPES[i] ?? "",
+      callTypes: importableCallTypes[i] ?? "",
       statuses: TICKET_STATUSES[i] ?? "",
       priorities: TICKET_PRIORITIES[i] ?? "",
       internalTags: INTERNAL_TAGS[i] ?? "",
@@ -435,6 +442,18 @@ export async function importTickets(req: Request, res: Response) {
       status: cellToString(raw.status),
       internalTag: cellToString(raw.internalTag),
     };
+
+    // Routine Checks tickets don't fit this column shape (no account
+    // manager/assigned by/assigned to) and are FMS-only — bulk import isn't
+    // a supported path for them, same rationale as excluding them from export.
+    if (candidate.callType === "Routine Checks") {
+      results.push({
+        row: rowNumber,
+        success: false,
+        error: 'Routine Checks tickets cannot be bulk-imported — create them from the ticket form instead',
+      });
+      continue;
+    }
 
     const parsed = importRowSchema.safeParse(candidate);
     if (!parsed.success) {

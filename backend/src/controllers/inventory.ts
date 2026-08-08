@@ -124,7 +124,7 @@ export async function addToInventory(req: Request, res: Response) {
   const srNo = parseInt(req.params.srNo, 10);
 
   const ticketResult = await pool.query(
-    "SELECT sr_no, status FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
+    "SELECT sr_no, status, call_type FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
     [srNo]
   );
   if (ticketResult.rows.length === 0) {
@@ -132,6 +132,11 @@ export async function addToInventory(req: Request, res: Response) {
   }
   if (ticketResult.rows[0].status === "Closed") {
     return res.status(400).json({ error: "Cannot add a closed ticket to inventory — reopen it first" });
+  }
+  // Routine Checks tickets are the FMS daily checklist report — no device
+  // changes hands, so there's no inward/outward repair workflow to track.
+  if (ticketResult.rows[0].call_type === "Routine Checks") {
+    return res.status(400).json({ error: "Routine Checks tickets can't be added to Inward/Outward" });
   }
 
   const result = await pool.query(

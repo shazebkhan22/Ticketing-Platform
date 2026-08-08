@@ -36,10 +36,17 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Info } from "lucide-react";
 import { todayLocalDate } from "@/lib/ticket-utils";
-import { TICKET_FIELD_TOOLTIPS } from "@/constants/ticket";
+import { ROUTINE_CHECK_TASKS } from "@/constants/ticket";
+import type { RoutineCheckItem, RoutineCheckStatus } from "@/types/ticket";
+
+const EMPTY_ROUTINE_CHECKS: RoutineCheckItem[] = ROUTINE_CHECK_TASKS.map((t) => ({
+  section: t.section,
+  task: t.task,
+  detail: t.detail,
+  status: "N/A" as RoutineCheckStatus,
+  note: "",
+}));
 
 const EMPTY_FORM: TicketFormValues = {
   ticketDate: todayLocalDate(),
@@ -52,13 +59,14 @@ const EMPTY_FORM: TicketFormValues = {
   model: "",
   serialNumber: "",
   problem: "",
-  accountManagerId: 0,
+  accountManagerId: undefined,
   assignedBy: "",
   callType: "Call",
   assigneeUserIds: [],
   priority: "P3",
   deadlineDate: "",
   internalTag: "External",
+  routineChecks: EMPTY_ROUTINE_CHECKS,
 };
 
 function ticketToFormValues(ticket: TicketDetail["ticket"]): TicketFormValues {
@@ -73,13 +81,14 @@ function ticketToFormValues(ticket: TicketDetail["ticket"]): TicketFormValues {
     model: ticket.model ?? "",
     serialNumber: ticket.serialNumber ?? "",
     problem: ticket.problem,
-    accountManagerId: ticket.accountManagerId ?? 0,
+    accountManagerId: ticket.accountManagerId ?? undefined,
     assignedBy: ticket.assignedBy ?? "",
     callType: ticket.callType,
     assigneeUserIds: ticket.assignees.map((a) => a.id),
     priority: ticket.priority,
     deadlineDate: ticket.deadlineDate?.slice(0, 10) ?? "",
     internalTag: ticket.internalTag,
+    routineChecks: ticket.routineChecks.length > 0 ? ticket.routineChecks : EMPTY_ROUTINE_CHECKS,
   };
 }
 
@@ -92,8 +101,7 @@ export function TicketFormPage() {
   const isAdmin = user?.role === "admin";
 
   const { data: options, isLoading: optionsLoading } = useMetaOptions();
-  const { data: ticketDetail, isLoading: ticketLoading } =
-    useTicketDetail(ticketSrNo);
+  const { data: ticketDetail, isLoading: ticketLoading } = useTicketDetail(ticketSrNo);
   const createTicketMutation = useCreateTicket();
   const updateTicketMutation = useUpdateTicket(ticketSrNo);
 
@@ -110,10 +118,7 @@ export function TicketFormPage() {
   // on the backend) — a new ticket should default to that instead of an
   // empty picker, since it's always part of the final set either way.
   const emptyFormForUser = useMemo(
-    () =>
-      !isAdmin && user
-        ? { ...EMPTY_FORM, assigneeUserIds: [user.id] }
-        : EMPTY_FORM,
+    () => (!isAdmin && user ? { ...EMPTY_FORM, assigneeUserIds: [user.id] } : EMPTY_FORM),
     [isAdmin, user]
   );
 
@@ -123,8 +128,7 @@ export function TicketFormPage() {
   // being updated afterwards — Radix's Select trigger does not reliably
   // reflect a controlled `value` change that happens after initial mount.
   const defaultValues = useMemo(
-    () =>
-      ticketDetail ? ticketToFormValues(ticketDetail.ticket) : emptyFormForUser,
+    () => (ticketDetail ? ticketToFormValues(ticketDetail.ticket) : emptyFormForUser),
     [ticketDetail, emptyFormForUser]
   );
 
@@ -139,18 +143,44 @@ export function TicketFormPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketDetail]);
 
+  // Routine Checks (the FMS daily system-admin checklist report) is only
+  // pickable by Team FMS and admins — mirrors requireFieldTeamOrAdmin-style
+  // gating on the backend (see createTicket's isRoutineChecks branch). A
+  // non-FMS engineer who ends up assigned to an existing Routine Checks
+  // ticket (e.g. reassigned by an admin) still needs to see its current
+  // call type in the dropdown, or the Select renders with a value that
+  // isn't in its own option list — so the ticket's existing callType is
+  // always kept in the list even when the viewer couldn't newly pick it.
+  const isFmsOrAdmin = isAdmin || user?.team === "FMS";
+  const existingCallType = ticketDetail?.ticket.callType;
+  const callTypeOptions =
+    isFmsOrAdmin || existingCallType === "Routine Checks"
+      ? (options?.callTypes ?? [])
+      : (options?.callTypes ?? []).filter((c) => c !== "Routine Checks");
+  const callType = form.watch("callType");
+  const isRoutineChecks = callType === "Routine Checks";
+  const routineChecks = form.watch("routineChecks") ?? [];
+
+  function updateRoutineCheck(
+    index: number,
+    patch: Partial<{ status: RoutineCheckStatus; note: string }>
+  ) {
+    const next = [...routineChecks];
+    next[index] = { ...next[index], ...patch };
+    form.setValue("routineChecks", next as TicketFormValues["routineChecks"], {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  }
+
   async function onSubmit(values: TicketFormValues) {
     try {
       if (isEdit) {
-        await updateTicketMutation.mutateAsync(
-          values as Partial<TicketFormInput>
-        );
+        await updateTicketMutation.mutateAsync(values as Partial<TicketFormInput>);
         toast.success("Ticket updated");
         navigate(`/tickets/${ticketSrNo}`);
       } else {
-        const created = await createTicketMutation.mutateAsync(
-          values as TicketFormInput
-        );
+        const created = await createTicketMutation.mutateAsync(values as TicketFormInput);
         toast.success(`Ticket ${created.ticketNo} created`);
         navigate(`/tickets/${created.srNo}`);
       }
@@ -175,8 +205,7 @@ export function TicketFormPage() {
     );
   }
 
-  const submitting =
-    createTicketMutation.isPending || updateTicketMutation.isPending;
+  const submitting = createTicketMutation.isPending || updateTicketMutation.isPending;
 
   return (
     <div className="">
@@ -196,11 +225,7 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Date Received *</FormLabel>
                   <FormControl>
-                    <DatePicker
-                      disabled
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
+                    <DatePicker disabled value={field.value} onChange={field.onChange} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -284,11 +309,7 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Contact Name *</FormLabel>
                   <FormControl>
-                    <Input
-                      capitalize
-                      {...field}
-                      placeholder="Enter your full name"
-                    />
+                    <Input capitalize {...field} placeholder="Enter your full name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -316,11 +337,7 @@ export function TicketFormPage() {
                 <FormItem>
                   <FormLabel>Email ID *</FormLabel>
                   <FormControl>
-                    <Input
-                      type="email"
-                      placeholder="Enter your email address"
-                      {...field}
-                    />
+                    <Input type="email" placeholder="Enter your email address" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -351,17 +368,7 @@ export function TicketFormPage() {
               name="model"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-1">
-                    Model
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3.5 w-3.5 cursor-help text-primary" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {TICKET_FIELD_TOOLTIPS.Model}
-                      </TooltipContent>
-                    </Tooltip>
-                  </FormLabel>
+                  <FormLabel>Model</FormLabel>
                   <FormControl>
                     <Input
                       capitalize
@@ -379,17 +386,7 @@ export function TicketFormPage() {
               name="serialNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-1">
-                    Serial Number(s)
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3.5 w-3.5 cursor-help text-primary" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {TICKET_FIELD_TOOLTIPS["Serial Number(s)"]}
-                      </TooltipContent>
-                    </Tooltip>
-                  </FormLabel>
+                  <FormLabel>Serial Number(s)</FormLabel>
                   <FormControl>
                     <Input
                       placeholder="Comma-separated if multiple eg: 5CD6108XFV, 5CD6107CQM, 5CD6107WJB"
@@ -422,48 +419,6 @@ export function TicketFormPage() {
 
             <FormField
               control={form.control}
-              name="accountManagerId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Account Manager *</FormLabel>
-                  <FormControl>
-                    <AccountManagerSelect
-                      value={field.value || undefined}
-                      onChange={field.onChange}
-                      options={options.accountManagerDirectory}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="assignedBy"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Assigned By *</FormLabel>
-                  <FormControl>
-                    <Combobox
-                      value={field.value}
-                      onChange={field.onChange}
-                      options={options.assignedBys.map((a) => ({
-                        value: a,
-                        label: a,
-                      }))}
-                      placeholder="Person in the company who assigned this ticket"
-                      searchPlaceholder="Search or type a name..."
-                      allowCustomValue
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="callType"
               render={({ field }) => (
                 <FormItem>
@@ -475,7 +430,7 @@ export function TicketFormPage() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {options.callTypes.map((c) => (
+                      {callTypeOptions.map((c) => (
                         <SelectItem key={c} value={c}>
                           {c}
                         </SelectItem>
@@ -487,119 +442,237 @@ export function TicketFormPage() {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="assigneeUserIds"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Assigned To *</FormLabel>
-                  <FormControl>
-                    <MultiSelect
-                      value={field.value.map(String)}
-                      onChange={(vals) => field.onChange(vals.map(Number))}
-                      options={(isAdmin
-                        ? options.assignedToOptions
-                        : options.assignedToOptions.filter(
-                            (emp) =>
-                              emp.id === user?.id || emp.role === "employee"
-                          )
-                      ).map((emp) => ({
-                        value: String(emp.id),
-                        label: emp.displayName,
-                      }))}
-                      placeholder="Select employees"
-                      searchPlaceholder="Search employees..."
-                      emptyText="No employee found."
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="deadlineDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Deadline Date</FormLabel>
-                  <FormControl>
-                    <DatePicker
-                      disabled={isEdit}
-                      value={field.value}
-                      onChange={field.onChange}
-                      placeholder="No deadline"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="priority"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Priority *</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
+            {!isRoutineChecks && (
+              <FormField
+                control={form.control}
+                name="accountManagerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Account Manager *</FormLabel>
                     <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue>{field.value}</SelectValue>
-                      </SelectTrigger>
+                      <AccountManagerSelect
+                        value={field.value || undefined}
+                        onChange={field.onChange}
+                        options={options.accountManagerDirectory}
+                      />
                     </FormControl>
-                    <SelectContent>
-                      {options.priorities.map((p) => (
-                        <SelectItem key={p} value={p}>
-                          {p}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
-            <FormField
-              control={form.control}
-              name="internalTag"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Internal Tag</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
+            {!isRoutineChecks && (
+              <FormField
+                control={form.control}
+                name="assignedBy"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assigned By *</FormLabel>
                     <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue>{field.value}</SelectValue>
-                      </SelectTrigger>
+                      <Combobox
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        options={options.assignedBys.map((a) => ({
+                          value: a,
+                          label: a,
+                        }))}
+                        placeholder="Person in the company who assigned this ticket"
+                        searchPlaceholder="Search or type a name..."
+                        allowCustomValue
+                      />
                     </FormControl>
-                    <SelectContent>
-                      {options.internalTags.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {!isRoutineChecks && (
+              <FormField
+                control={form.control}
+                name="assigneeUserIds"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assigned To *</FormLabel>
+                    <FormControl>
+                      <MultiSelect
+                        value={(field.value ?? []).map(String)}
+                        onChange={(vals) => field.onChange(vals.map(Number))}
+                        options={(isAdmin
+                          ? options.assignedToOptions
+                          : options.assignedToOptions.filter(
+                              (emp) => emp.id === user?.id || emp.role === "employee"
+                            )
+                        ).map((emp) => ({
+                          value: String(emp.id),
+                          label: emp.displayName,
+                        }))}
+                        placeholder="Select employees"
+                        searchPlaceholder="Search employees..."
+                        emptyText="No employee found."
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {!isRoutineChecks && (
+              <FormField
+                control={form.control}
+                name="deadlineDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Deadline Date</FormLabel>
+                    <FormControl>
+                      <DatePicker
+                        disabled={isEdit}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="No deadline"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {!isRoutineChecks && (
+              <FormField
+                control={form.control}
+                name="priority"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Priority *</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue>{field.value}</SelectValue>
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {options.priorities.map((p) => (
+                          <SelectItem key={p} value={p}>
+                            {p}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {!isRoutineChecks && (
+              <FormField
+                control={form.control}
+                name="internalTag"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Internal Tag</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="w-full">
+                          <SelectValue>{field.value}</SelectValue>
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {options.internalTags.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
           </div>
+
+          {isRoutineChecks && (
+            <div className="mt-6 space-y-6">
+              {(["Routine Checks", "System Updates & Patch Management"] as const).map((section) => (
+                <div key={section}>
+                  <h3 className="mb-2 text-sm font-medium">{section}</h3>
+                  <div className="overflow-x-auto rounded-md border border-neutral-200">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-neutral-200 bg-neutral-50 text-left text-neutral-500">
+                          <th className="px-3 py-2 font-medium w-80">Task</th>
+                          <th className="px-3 py-2 font-medium w-60">Status</th>
+                          <th className="px-3 py-2 font-medium">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {routineChecks
+                          .map((item, index) => ({ item, index }))
+                          .filter(({ item }) => item.section === section)
+                          .map(({ item, index }) => (
+                            <tr
+                              key={`${item.section}-${item.task}`}
+                              className="border-b border-neutral-100 last:border-0"
+                            >
+                              <td className="px-3 py-2 text-neutral-800">
+                                {item.task}
+                                {item.detail && (
+                                  <span className="ml-1 text-xs text-neutral-500">
+                                    ({item.detail})
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2">
+                                <Select
+                                  value={item.status}
+                                  onValueChange={(status) =>
+                                    updateRoutineCheck(index, {
+                                      status: status as RoutineCheckStatus,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue>{item.status}</SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Completed">Completed</SelectItem>
+                                    <SelectItem value="N/A">N/A</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </td>
+                              <td className="px-3 py-2">
+                                <Input
+                                  value={item.note ?? ""}
+                                  onChange={(e) =>
+                                    updateRoutineCheck(index, { note: e.target.value })
+                                  }
+                                  placeholder="Notes"
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+              {form.formState.errors.routineChecks && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.routineChecks.message}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="mt-6 flex gap-2">
             <Button type="submit" disabled={submitting}>
-              {submitting
-                ? "Saving..."
-                : isEdit
-                ? "Save Changes"
-                : "Create Ticket"}
+              {submitting ? "Saving..." : isEdit ? "Save Changes" : "Create Ticket"}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate(-1)}
-            >
+            <Button type="button" variant="outline" onClick={() => navigate(-1)}>
               Cancel
             </Button>
           </div>

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -14,12 +14,15 @@ import {
   UserCog,
   Clock,
   MessageSquare,
-  Hourglass,
-  Loader,
   CheckCircle2,
   TriangleAlert,
+  Info,
 } from "lucide-react";
-import { adminFeedbackResponseSchema, ticketRemarkSchema as remarkSchema } from "@/lib/schemas";
+import {
+  adminFeedbackResponseSchema,
+  ticketRemarkSchema as remarkSchema,
+  inventoryUpdateSchema,
+} from "@/lib/schemas";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -28,16 +31,21 @@ import {
   useUpdateAdminFeedbackResponse,
   useUpdateTicketStatus,
 } from "@/hooks/useTickets";
-import { useAddToInventory } from "@/hooks/useInventory";
+import { useAddToInventory, useUpdateInventory } from "@/hooks/useInventory";
 import type { TicketStatus } from "@/types/ticket";
+import type { RepairLocation, EditFormState } from "@/types/inventory";
 import {
   STATUS_FLOW,
+  STATUS_ICONS,
   PRIORITY_CLASSES,
   PRIORITY_LABELS,
   isLegalStatusTransition,
 } from "@/constants/ticket";
+import { DATE_TOOLTIPS } from "@/constants/inventory";
 import { StatusBadge } from "@/components/StatusBadge";
 import { InstallationReport } from "@/components/InstallationReport";
+import { Field, InfoPill, SectionCard } from "@/components/DetailCard";
+import { RoutineChecksTable } from "@/components/RoutineChecksTable";
 import {
   formatDate,
   formatDateTime,
@@ -47,10 +55,19 @@ import {
 } from "@/lib/ticket-utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -70,67 +87,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-const STATUS_ICONS: Record<TicketStatus, typeof Clock> = {
-  Pending: Hourglass,
-  "In Progress": Loader,
-  Closed: CheckCircle2,
-};
-
-function Field({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div>
-      <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">{label}</div>
-      <div className="mt-0.5 text-sm text-neutral-800 wrap-break-word whitespace-normal">
-        {value || "-"}
-      </div>
-    </div>
-  );
-}
-
-function InfoPill({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Building2;
-  label: string;
-  value?: string | null;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cygnus-50 text-cygnus-800">
-        <Icon className="h-5 w-5" />
-      </span>
-      <div className="min-w-0">
-        <div className="truncate text-sm font-medium text-neutral-800">{value || "-"}</div>
-        <div className="text-xs text-neutral-500">{label}</div>
-      </div>
-    </div>
-  );
-}
-
-function SectionCard({
-  icon: Icon,
-  title,
-  children,
-}: {
-  icon: typeof Building2;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <Card>
-      <CardContent>
-        <h3 className="mb-3 flex items-center gap-2 font-bold text-cygnus-800">
-          <Icon className="h-4 w-4" />
-          {title}
-        </h3>
-        {children}
-      </CardContent>
-    </Card>
-  );
-}
-
 export function TicketDetailPage() {
   const { srNo } = useParams<{ srNo: string }>();
   const navigate = useNavigate();
@@ -142,6 +98,7 @@ export function TicketDetailPage() {
   const updateAdminFeedbackResponse = useUpdateAdminFeedbackResponse(ticketSrNo);
   const addRemarkMutation = useAddRemark(ticketSrNo);
   const addToInventoryMutation = useAddToInventory();
+  const updateInventoryMutation = useUpdateInventory();
 
   const [newRemark, setNewRemark] = useState("");
   const [remarkError, setRemarkError] = useState<string | null>(null);
@@ -152,6 +109,7 @@ export function TicketDetailPage() {
   const [confirmedCallTime, setConfirmedCallTime] = useState("");
   const [pendingStatus, setPendingStatus] = useState<TicketStatus | null>(null);
   const [confirmAddToInventoryOpen, setConfirmAddToInventoryOpen] = useState(false);
+  const [inventoryForm, setInventoryForm] = useState<EditFormState | null>(null);
 
   if (isLoading || !data) {
     return (
@@ -185,7 +143,7 @@ export function TicketDetailPage() {
     if (status === ticket.status) return;
     if (status === "Closed" && ticket.inventoryPending) {
       toast.error(
-        "This ticket has a pending inventory item that hasn't been dispatched yet. Complete the outward workflow in Inventory before closing."
+        "This ticket has a pending inward item that hasn't been dispatched yet. Complete the outward workflow in Inward/Outward before closing."
       );
       return;
     }
@@ -218,20 +176,80 @@ export function TicketDetailPage() {
   }
 
   const engineerName = ticket.assignees.map((a) => a.displayName).join(", ");
-  // Team FMS has no access to inventory at all — only admins and Team Field.
-  // A closed ticket is done — reopen it first if it turns out inventory work
-  // is needed after all.
+  // Team FMS has no access to inward/outward at all — only admins and Team Field.
+  // A closed ticket is done — reopen it first if it turns out inward/outward work
+  // is needed after all. Routine Checks tickets never involve a physical
+  // device changing hands, so they're excluded regardless of role (mirrors
+  // the backend check in addToInventory).
   const canAddToInventory =
-    canEdit && (user?.role === "admin" || user?.team === "Field") && ticket.status !== "Closed";
+    canEdit &&
+    (user?.role === "admin" || user?.team === "Field") &&
+    ticket.status !== "Closed" &&
+    ticket.callType !== "Routine Checks";
 
   async function handleAddToInventory() {
     try {
       await addToInventoryMutation.mutateAsync(ticket.srNo);
-      toast.success("Added to inventory");
+      toast.success("Added to Inward/Outward");
     } catch {
-      toast.error("Failed to add to inventory");
+      toast.error("Failed to add to Inward/Outward");
     } finally {
       setConfirmAddToInventoryOpen(false);
+    }
+  }
+
+  // Viewing the inward/outward details is restricted to the same audience
+  // as the rest of the Inventory feature — admins and Team Field only (Team
+  // FMS/Office never see inventory data anywhere else either).
+  const canSeeInventoryDetails =
+    (user?.role === "admin" || user?.team === "Field") && ticket.inInventory;
+  // Same audience as canAddToInventory, minus the "not yet added" and
+  // "not Closed" restrictions — editing an existing inward/outward record
+  // stays open even after the ticket closes (mirrors upsertInventory, which
+  // has no ticket-status check).
+  const canEditInventory =
+    canEdit &&
+    (user?.role === "admin" || user?.team === "Field") &&
+    ticket.callType !== "Routine Checks" &&
+    ticket.inInventory;
+  // The dispatch workflow is done once an outward date is set — nothing
+  // left to update (mirrors InventoryPage's isCompleted).
+  const inventoryCompleted = Boolean(ticket.inventory?.outwardDate);
+
+  function openInventoryEdit() {
+    setInventoryForm({
+      inwardDate: ticket.inventory?.inwardDate ?? "",
+      outwardDate: ticket.inventory?.outwardDate ?? "",
+      repairLocation: ticket.inventory?.repairLocation ?? "In-House",
+      outsourceVendor: ticket.inventory?.outsourceVendor ?? "",
+      expectedReturnDate: ticket.inventory?.expectedReturnDate ?? "",
+      deliveryPerson: ticket.inventory?.deliveryPerson ?? "",
+    });
+  }
+
+  async function handleSaveInventory() {
+    if (!inventoryForm) return;
+    const parsed = inventoryUpdateSchema.safeParse(inventoryForm);
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0].message);
+      return;
+    }
+    try {
+      await updateInventoryMutation.mutateAsync({
+        srNo: ticket.srNo,
+        input: {
+          inwardDate: inventoryForm.inwardDate || undefined,
+          outwardDate: inventoryForm.outwardDate || undefined,
+          repairLocation: inventoryForm.repairLocation,
+          outsourceVendor: inventoryForm.outsourceVendor || undefined,
+          expectedReturnDate: inventoryForm.expectedReturnDate || undefined,
+          deliveryPerson: inventoryForm.deliveryPerson || undefined,
+        },
+      });
+      toast.success("Inward/Outward updated");
+      setInventoryForm(null);
+    } catch {
+      toast.error("Failed to update Inward/Outward");
     }
   }
 
@@ -302,7 +320,7 @@ export function TicketDetailPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pendingStatus === "Closed"
-                ? "This marks the ticket as resolved. If the customer hasn't already been notified (e.g. via the inventory dispatch email), we'll email them now. You can reopen it later if needed."
+                ? "This marks the ticket as resolved. If the customer hasn't already been notified (e.g. via the inward dispatch email), we'll email them now. You can reopen it later if needed."
                 : `This will change the ticket's status from ${ticket.status} to ${pendingStatus}.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -318,10 +336,10 @@ export function TicketDetailPage() {
       <AlertDialog open={confirmAddToInventoryOpen} onOpenChange={setConfirmAddToInventoryOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Add this ticket to Inventory?</AlertDialogTitle>
+            <AlertDialogTitle>Add this ticket to Inward/Outward?</AlertDialogTitle>
             <AlertDialogDescription>
-              This creates an inventory entry for ticket {ticket.ticketNo} so its inward/outward
-              repair workflow can be tracked. It can't be removed from Inventory once added.
+              This creates an inward entry for ticket {ticket.ticketNo} so its inward/outward repair
+              workflow can be tracked. It can't be removed from Inward/Outward once added.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -330,11 +348,147 @@ export function TicketDetailPage() {
               onClick={handleAddToInventory}
               disabled={addToInventoryMutation.isPending}
             >
-              {addToInventoryMutation.isPending ? "Adding..." : "Add to Inventory"}
+              {addToInventoryMutation.isPending ? "Adding..." : "Add to Inward/Outward"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={inventoryForm !== null}
+        onOpenChange={(open) => !open && setInventoryForm(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Inward/Outward — {ticket.ticketNo}</DialogTitle>
+          </DialogHeader>
+
+          {inventoryForm && (
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-neutral-500">
+                  Inward Date
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-3.5 w-3.5 cursor-help text-primary" />
+                    </TooltipTrigger>
+                    <TooltipContent>{DATE_TOOLTIPS["Inward Date"]}</TooltipContent>
+                  </Tooltip>
+                </label>
+                <DatePicker
+                  value={inventoryForm.inwardDate}
+                  onChange={(v) => setInventoryForm({ ...inventoryForm, inwardDate: v })}
+                  placeholder="Not received yet"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-neutral-500">
+                  Repair Location
+                </label>
+                <Select
+                  value={inventoryForm.repairLocation}
+                  onValueChange={(v) =>
+                    setInventoryForm({ ...inventoryForm, repairLocation: v as RepairLocation })
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="In-House">In-House</SelectItem>
+                    <SelectItem value="Outsourced">Outsourced</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {inventoryForm.repairLocation === "Outsourced" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-neutral-500">
+                      Outsource Vendor
+                    </label>
+                    <Input
+                      value={inventoryForm.outsourceVendor}
+                      onChange={(e) =>
+                        setInventoryForm({ ...inventoryForm, outsourceVendor: e.target.value })
+                      }
+                      placeholder="e.g. ABC Repair Center"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-neutral-500">
+                      Expected Return Date
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 cursor-help text-primary" />
+                        </TooltipTrigger>
+                        <TooltipContent>{DATE_TOOLTIPS["Expected Return Date"]}</TooltipContent>
+                      </Tooltip>
+                    </label>
+                    <DatePicker
+                      value={inventoryForm.expectedReturnDate}
+                      onChange={(v) =>
+                        setInventoryForm({ ...inventoryForm, expectedReturnDate: v })
+                      }
+                      placeholder="Not set"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-neutral-500">
+                      Delivery Person
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 cursor-help text-primary" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Who's being sent to hand-deliver the product back to the customer.
+                        </TooltipContent>
+                      </Tooltip>
+                    </label>
+                    <Input
+                      value={inventoryForm.deliveryPerson}
+                      onChange={(e) =>
+                        setInventoryForm({ ...inventoryForm, deliveryPerson: e.target.value })
+                      }
+                      placeholder="e.g. Ramesh Kumar"
+                    />
+                  </div>
+                </div>
+              )}
+              <div>
+                <label className="mb-1 flex items-center gap-1 text-xs font-semibold text-neutral-500">
+                  Outward Date
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-3.5 w-3.5 cursor-help text-primary" />
+                    </TooltipTrigger>
+                    <TooltipContent>{DATE_TOOLTIPS["Outward Date"]}</TooltipContent>
+                  </Tooltip>
+                </label>
+                <DatePicker
+                  value={inventoryForm.outwardDate}
+                  onChange={(v) => setInventoryForm({ ...inventoryForm, outwardDate: v })}
+                  placeholder="Not dispatched yet"
+                  disabled={!inventoryForm.inwardDate}
+                />
+                {!inventoryForm.inwardDate && (
+                  <p className="mt-1 text-xs text-neutral-400">
+                    Set an inward date before setting the outward date.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInventoryForm(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveInventory} disabled={updateInventoryMutation.isPending}>
+              {updateInventoryMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="print:hidden">
         <div className="no-print mb-4">
@@ -344,23 +498,6 @@ export function TicketDetailPage() {
         <div className="no-print mb-2 flex flex-wrap items-start justify-between">
           <div>
             <h2 className="text-xl font-bold text-neutral-800">Ticket: {ticket.ticketNo}</h2>
-            {/* <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <StatusBadge ticket={ticket} />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge variant="secondary" className={cn("rounded-full", PRIORITY_CLASSES[ticket.priority])}>
-                    {ticket.priority}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>{PRIORITY_LABELS[ticket.priority]}</TooltipContent>
-              </Tooltip>
-              <Badge variant="secondary" className="rounded-full bg-purple-100 text-purple-800">
-                {ticket.callType}
-              </Badge>
-              <Badge variant="secondary" className="rounded-full bg-slate-100 text-slate-700">
-                {ticket.internalTag}
-              </Badge>
-            </div> */}
           </div>
           <div className="flex gap-2">
             {ticket.status === "Closed" && (
@@ -430,10 +567,10 @@ export function TicketDetailPage() {
                       disabled={ticket.inInventory || addToInventoryMutation.isPending}
                     >
                       {ticket.inInventory
-                        ? "Added to Inventory"
+                        ? "Added to Inward/Outward"
                         : addToInventoryMutation.isPending
                           ? "Adding..."
-                          : "Add to Inventory"}
+                          : "Add to Inward/Outward"}
                     </Button>
                   </div>
                 )}
@@ -458,13 +595,17 @@ export function TicketDetailPage() {
                     )}
                   </div>
                 </div>
-                <Field label="Assigned By" value={ticket.assignedBy} />
-                <Field label="Account Manager" value={ticket.accountManager} />
-                <Field label="Priority" value={ticket.priority} />
-                <Field
-                  label="Deadline"
-                  value={ticket.deadlineDate ? formatDate(ticket.deadlineDate) : "-"}
-                />
+                {ticket.callType !== "Routine Checks" && (
+                  <>
+                    <Field label="Assigned By" value={ticket.assignedBy} />
+                    <Field label="Account Manager" value={ticket.accountManager} />
+                    <Field label="Priority" value={ticket.priority} />
+                    <Field
+                      label="Deadline"
+                      value={ticket.deadlineDate ? formatDate(ticket.deadlineDate) : "-"}
+                    />
+                  </>
+                )}
               </div>
 
               {canEdit && (
@@ -502,8 +643,8 @@ export function TicketDetailPage() {
                           <Tooltip key={s}>
                             <TooltipTrigger asChild>{button}</TooltipTrigger>
                             <TooltipContent>
-                              Pending inventory dispatch — complete the outward workflow in
-                              Inventory first.
+                              Pending inward dispatch — complete the outward workflow in
+                              Inward/Outward first.
                             </TooltipContent>
                           </Tooltip>
                         );
@@ -527,14 +668,21 @@ export function TicketDetailPage() {
                     <div className="mt-3 flex items-start gap-2 text-xs text-amber-700">
                       <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       <span>
-                        This ticket has a product in Inventory that hasn't been dispatched back to
-                        the customer yet — it can't be closed until that's done.
+                        This ticket includes a product inward that has not yet been dispatched back
+                        to the customer. The ticket cannot be closed until the product is
+                        dispatched.
                       </span>
                     </div>
                   )}
                 </div>
               )}
             </SectionCard>
+
+            {ticket.callType === "Routine Checks" && ticket.routineChecks.length > 0 && (
+              <SectionCard icon={CheckCircle2} title="Checklist">
+                <RoutineChecksTable routineChecks={ticket.routineChecks} />
+              </SectionCard>
+            )}
 
             {ticket.status === "Closed" && ticket.customerFeedbackSubmittedAt && (
               <SectionCard icon={StarIcon} title="Customer Feedback">
@@ -622,30 +770,34 @@ export function TicketDetailPage() {
                   </span>
                   <span className="text-sm text-neutral-800">{ticket.callType}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-                    Priority
-                  </span>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge
-                        variant="secondary"
-                        className={cn("rounded-full", PRIORITY_CLASSES[ticket.priority])}
-                      >
-                        {ticket.priority}
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent>{PRIORITY_LABELS[ticket.priority]}</TooltipContent>
-                  </Tooltip>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-                    Deadline
-                  </span>
-                  <span className="text-sm text-neutral-800">
-                    {ticket.deadlineDate ? formatDate(ticket.deadlineDate) : "-"}
-                  </span>
-                </div>
+                {ticket.callType !== "Routine Checks" && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                        Priority
+                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge
+                            variant="secondary"
+                            className={cn("rounded-full", PRIORITY_CLASSES[ticket.priority])}
+                          >
+                            {ticket.priority}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>{PRIORITY_LABELS[ticket.priority]}</TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                        Deadline
+                      </span>
+                      <span className="text-sm text-neutral-800">
+                        {ticket.deadlineDate ? formatDate(ticket.deadlineDate) : "-"}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {overdue && (
@@ -666,6 +818,71 @@ export function TicketDetailPage() {
                   <div className="text-xs text-neutral-500">{formatDateTime(ticket.createdAt)}</div>
                 </div>
               </div>
+
+              {canSeeInventoryDetails && (
+                <div className="mt-4 border-t border-neutral-200 pt-4">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                    <Laptop className="h-3.5 w-3.5" />
+                    Inward / Outward
+                  </div>
+                  <div className="space-y-3">
+                    <Field
+                      label="Inward Date"
+                      value={
+                        ticket.inventory?.inwardDate ? formatDate(ticket.inventory.inwardDate) : "-"
+                      }
+                    />
+                    <Field
+                      label="Outward Date"
+                      value={
+                        ticket.inventory?.outwardDate
+                          ? formatDate(ticket.inventory.outwardDate)
+                          : "-"
+                      }
+                    />
+                    <Field label="Repair Location" value={ticket.inventory?.repairLocation} />
+                    {ticket.inventory?.repairLocation === "Outsourced" && (
+                      <>
+                        <Field label="Outsource Vendor" value={ticket.inventory?.outsourceVendor} />
+                        <Field
+                          label="Expected Return Date"
+                          value={
+                            ticket.inventory?.expectedReturnDate
+                              ? formatDate(ticket.inventory.expectedReturnDate)
+                              : "-"
+                          }
+                        />
+                        <Field label="Delivery Person" value={ticket.inventory?.deliveryPerson} />
+                      </>
+                    )}
+                  </div>
+                  {canEditInventory && (
+                    <div className="no-print mt-3">
+                      {inventoryCompleted ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled
+                              className="text-emerald-700"
+                            >
+                              Completed
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Already dispatched back to the customer — nothing left to update.
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={openInventoryEdit}>
+                          Update Inward/Outward
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </SectionCard>
           </div>
         </div>

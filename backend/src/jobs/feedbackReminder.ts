@@ -20,7 +20,11 @@ async function runFeedbackReminderSweep() {
        AND closed_at <= now() - interval '24 hours'
        AND feedback_requested_at IS NULL
        AND email_id IS NOT NULL
-       AND email_id <> ''`
+       AND email_id <> ''
+       -- Routine Checks is the FMS engineer's own daily report, not a
+       -- customer support case — there's no customer to ask for
+       -- satisfaction feedback on it.
+       AND call_type != 'Routine Checks'`
   );
 
   for (const ticket of result.rows) {

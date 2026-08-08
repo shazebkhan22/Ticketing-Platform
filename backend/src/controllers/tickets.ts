@@ -15,9 +15,25 @@ import {
   TICKET_STATUSES,
   INTERNAL_TAGS,
   TICKET_PRIORITIES,
+  ROUTINE_CHECK_STATUSES,
 } from "../types/ticket";
 
-const createTicketSchema = z.object({
+const routineCheckItemSchema = z.object({
+  section: z.enum(["Routine Checks", "System Updates & Patch Management"]),
+  task: z.string().min(1),
+  detail: z.string().optional(),
+  status: z.enum(ROUTINE_CHECK_STATUSES),
+  note: z.string().optional(),
+});
+
+// Routine Checks tickets (the FMS daily system-admin checklist report) use a
+// different required-field set than every other call type: no account
+// manager/assigned by/assignee picker/priority/internal tag/deadline, but a
+// mandatory non-empty checklist instead — the usual company/contact fields
+// already identify who's submitting the report. Base fields are all
+// optional here so one schema can validate both shapes; the superRefine
+// below enforces the actual per-callType requirements.
+const createTicketBaseSchema = z.object({
   ticketDate: z.string(),
   mode: z.enum(TICKET_MODES),
   companyName: z.string().min(1),
@@ -31,23 +47,48 @@ const createTicketSchema = z.object({
   // Account Manager = whoever in the office reported/raised this issue.
   // Used to be free text; now picked from the shared account_managers
   // directory (see migrations/1785160000000_add-account-managers.sql) so
-  // every ticket resolves to a real email, same as projects.
-  accountManagerId: z.coerce.number().int().positive(),
+  // every ticket resolves to a real email, same as projects. Not used by
+  // Routine Checks tickets.
+  accountManagerId: z.coerce.number().int().positive().optional(),
   // Assigned By = whoever in the company assigned/raised this ticket — free
   // text just like accountManager, can be anybody, not limited to platform users.
-  assignedBy: z.string().min(1),
+  assignedBy: z.string().optional(),
   callType: z.enum(CALL_TYPES),
   // Assigned To = which of the platform employees will resolve this ticket.
   // A ticket can have multiple assignees, all of whom get full edit/delete
   // rights (see requireTicketAssigneeOrAdmin) — this is the actual permission
-  // record, not who created the ticket.
-  assigneeUserIds: z.array(z.coerce.number().int().positive()).min(1, "At least one assignee required"),
+  // record, not who created the ticket. Routine Checks tickets skip the
+  // picker and auto-assign the submitting engineer instead (see createTicket).
+  assigneeUserIds: z.array(z.coerce.number().int().positive()).optional(),
   priority: z.enum(TICKET_PRIORITIES).optional(),
   deadlineDate: z.string().optional(),
   internalTag: z.enum(INTERNAL_TAGS).optional(),
+  routineChecks: z.array(routineCheckItemSchema).optional(),
 });
 
-const updateTicketSchema = createTicketSchema.partial().extend({
+const createTicketSchema = createTicketBaseSchema.superRefine((data, ctx) => {
+  if (data.callType === "Routine Checks") {
+    if (!data.routineChecks || data.routineChecks.length === 0) {
+      ctx.addIssue({ code: "custom", path: ["routineChecks"], message: "Checklist is required" });
+    }
+  } else {
+    if (!data.accountManagerId) {
+      ctx.addIssue({ code: "custom", path: ["accountManagerId"], message: "Required" });
+    }
+    if (!data.assignedBy?.trim()) {
+      ctx.addIssue({ code: "custom", path: ["assignedBy"], message: "Required" });
+    }
+    if (!data.assigneeUserIds || data.assigneeUserIds.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["assigneeUserIds"],
+        message: "At least one assignee required",
+      });
+    }
+  }
+});
+
+const updateTicketSchema = createTicketBaseSchema.partial().extend({
   // Optimistic concurrency: the client must send back the row_version it
   // last read. A stale value means someone else edited this ticket first —
   // updateTicket() below turns that mismatch into a 409, instead of the
@@ -95,6 +136,7 @@ function rowToTicket(row: any) {
     adminFeedbackRespondedAt: row.admin_feedback_responded_at,
     adminFeedbackRespondedBy: row.admin_feedback_responded_by,
     internalTag: row.internal_tag,
+    routineChecks: row.routine_checks ?? [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     closedAt: row.closed_at,
@@ -253,9 +295,13 @@ export async function getTicket(req: Request, res: Response) {
   const result = await pool.query(
     `SELECT t.*, COALESCE(assignee_agg.assignees, '[]'::json) AS assignees,
        EXISTS (SELECT 1 FROM ticket_inventory i WHERE i.ticket_sr_no = t.sr_no) AS in_inventory,
-       EXISTS (SELECT 1 FROM ticket_inventory i WHERE i.ticket_sr_no = t.sr_no AND i.outward_date IS NULL) AS inventory_pending
+       EXISTS (SELECT 1 FROM ticket_inventory i WHERE i.ticket_sr_no = t.sr_no AND i.outward_date IS NULL) AS inventory_pending,
+       inv.inward_date AS inv_inward_date, inv.outward_date AS inv_outward_date,
+       inv.repair_location AS inv_repair_location, inv.outsource_vendor AS inv_outsource_vendor,
+       inv.expected_return_date AS inv_expected_return_date, inv.delivery_person AS inv_delivery_person
      FROM tickets t
      ${ASSIGNEES_LATERAL_JOIN}
+     LEFT JOIN ticket_inventory inv ON inv.ticket_sr_no = t.sr_no
      WHERE t.sr_no = $1 AND t.deleted_at IS NULL`,
     [srNo]
   );
@@ -266,8 +312,26 @@ export async function getTicket(req: Request, res: Response) {
     "SELECT id, remark_date, body, created_by, created_at FROM remarks WHERE ticket_sr_no = $1 ORDER BY created_at ASC",
     [srNo]
   );
+  const row = result.rows[0];
+  const ticket = rowToTicket(row);
+  // Inward/outward detail is Field-team/admin-only everywhere else
+  // (addToInventory, upsertInventory, listInventory) — gate it here too so
+  // an FMS/Office assignee can't read it straight out of the API response
+  // even though the ticket detail page already hides the panel from them.
+  const canSeeInventory = req.session.role === "admin" || req.session.team === "Field";
+  (ticket as any).inventory =
+    canSeeInventory && row.in_inventory
+      ? {
+          inwardDate: row.inv_inward_date,
+          outwardDate: row.inv_outward_date,
+          repairLocation: row.inv_repair_location ?? "In-House",
+          outsourceVendor: row.inv_outsource_vendor,
+          expectedReturnDate: row.inv_expected_return_date,
+          deliveryPerson: row.inv_delivery_person,
+        }
+      : null;
   res.json({
-    ticket: rowToTicket(result.rows[0]),
+    ticket,
     remarks: remarksResult.rows.map((r) => ({
       id: r.id,
       remarkDate: r.remark_date,
@@ -319,18 +383,44 @@ export async function createTicket(req: Request, res: Response) {
   }
   const d = parsed.data;
 
-  if (d.deadlineDate && d.deadlineDate < d.ticketDate) {
+  const isRoutineChecks = d.callType === "Routine Checks";
+
+  if (!isRoutineChecks && d.deadlineDate && d.deadlineDate < d.ticketDate) {
     return res.status(400).json({ error: "Deadline cannot be before the ticket date" });
   }
 
-  const assigneeCheck = await resolveAssignees(req, d.assigneeUserIds);
+  // Routine Checks is the FMS daily system-admin checklist report — nobody
+  // outside Team FMS (or admins, who can do everything) has a reason to
+  // file one, same gating rationale as Inventory being Field-only.
+  if (isRoutineChecks && req.session.role !== "admin" && req.session.team !== "FMS") {
+    return res.status(403).json({ error: "Routine Checks is only available to Team FMS" });
+  }
+
+  // Routine Checks tickets skip the assignee picker entirely and are always
+  // self-assigned to the engineer submitting the report.
+  const assigneeUserIds = isRoutineChecks ? [req.session.userId!] : d.assigneeUserIds!;
+  const assigneeCheck = await resolveAssignees(req, assigneeUserIds);
   if (!assigneeCheck.ok) {
     return res.status(assigneeCheck.status).json({ error: assigneeCheck.error });
   }
 
-  const accountManagerName = await resolveAccountManagerName(d.accountManagerId);
-  if (accountManagerName === null) {
-    return res.status(400).json({ error: "Invalid account manager" });
+  // account_manager is NOT NULL at the DB level — Routine Checks tickets
+  // have no account manager picker, so the ticket's own contact name
+  // (the engineer filling in the report, per the required contactName
+  // field above) fills that column instead; account_manager_id stays NULL
+  // since it isn't tied to the account_managers directory.
+  let accountManagerName: string;
+  let accountManagerId: number | null;
+  if (isRoutineChecks) {
+    accountManagerName = d.contactName;
+    accountManagerId = null;
+  } else {
+    const resolved = await resolveAccountManagerName(d.accountManagerId!);
+    if (resolved === null) {
+      return res.status(400).json({ error: "Invalid account manager" });
+    }
+    accountManagerName = resolved;
+    accountManagerId = d.accountManagerId!;
   }
 
   const ticketDate = new Date(d.ticketDate);
@@ -359,8 +449,8 @@ export async function createTicket(req: Request, res: Response) {
       `INSERT INTO tickets (
         ticket_no, ticket_date, mode, customer_id, company_name, contact_name, contact_no, email_id, address,
         model, serial_number, problem, owner_user_id, account_manager, account_manager_id, assigned_by, call_type,
-        priority, deadline_date, internal_tag
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+        priority, deadline_date, internal_tag, routine_checks, status, closed_at
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
       RETURNING *`,
       [
         ticketNo,
@@ -377,16 +467,22 @@ export async function createTicket(req: Request, res: Response) {
         d.problem,
         ownerUserId,
         accountManagerName,
-        d.accountManagerId,
-        d.assignedBy,
+        accountManagerId,
+        isRoutineChecks ? null : d.assignedBy,
         d.callType,
         d.priority ?? "P3",
-        d.deadlineDate || null,
+        isRoutineChecks ? null : d.deadlineDate || null,
         d.internalTag ?? "External",
+        JSON.stringify(isRoutineChecks ? d.routineChecks : []),
+        // Routine Checks is a same-day completed report, not an open issue
+        // to track through Pending -> In Progress — the engineer filing it
+        // already did the work, so it lands Closed immediately.
+        isRoutineChecks ? "Closed" : "Pending",
+        isRoutineChecks ? new Date() : null,
       ]
     );
     ticket = result.rows[0];
-    await insertAssignees(client, ticket.sr_no, d.assigneeUserIds);
+    await insertAssignees(client, ticket.sr_no, assigneeUserIds);
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK");
@@ -422,7 +518,9 @@ export async function createTicket(req: Request, res: Response) {
     req.session.userId
   );
 
-  if (ticket.email_id) {
+  // Routine Checks is the FMS engineer's own daily report, not a customer
+  // support case — no "we received your request" email makes sense there.
+  if (ticket.email_id && !isRoutineChecks) {
     const text = `Dear ${ticket.contact_name || "Customer"},\n\nGreetings from the Cygnus Support Team.\n\nThis is to confirm that we have received your request and a support ticket has been created for the same.\n\nCase Reference Number: ${ticket.ticket_no}\nReported Issue: ${ticket.problem}\n\nOur team will review the issue and get in touch with you shortly. You may reference the case number above for any follow-up.\n\nBest regards,\nSupport Team`;
     await sendMail({
       to: ticket.email_id,
@@ -442,6 +540,28 @@ export async function updateTicket(req: Request, res: Response) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
   const d = parsed.data;
+
+  // Same gating as createTicket — otherwise any assignee/admin could flip an
+  // existing ticket's call type to Routine Checks through the edit endpoint
+  // and bypass the create-time restriction entirely. Only checked when this
+  // actually changes the call type: a Field/Office engineer who ends up
+  // assigned to an existing Routine Checks ticket (e.g. reassigned by an
+  // admin) still needs to be able to save unrelated edits to it — the form
+  // always resubmits the current callType, so blocking on the value alone
+  // would lock them out of the ticket entirely.
+  if (
+    d.callType === "Routine Checks" &&
+    req.session.role !== "admin" &&
+    req.session.team !== "FMS"
+  ) {
+    const current = await pool.query(
+      "SELECT call_type FROM tickets WHERE sr_no = $1 AND deleted_at IS NULL",
+      [srNo]
+    );
+    if (current.rows[0]?.call_type !== "Routine Checks") {
+      return res.status(403).json({ error: "Routine Checks is only available to Team FMS" });
+    }
+  }
 
   if (d.ticketDate !== undefined || d.deadlineDate !== undefined) {
     const existing = await pool.query(
@@ -487,6 +607,10 @@ export async function updateTicket(req: Request, res: Response) {
       params.push(value);
       setClauses.push(`${column} = $${params.length}`);
     }
+  }
+  if (d.routineChecks !== undefined) {
+    params.push(JSON.stringify(d.routineChecks));
+    setClauses.push(`routine_checks = $${params.length}`);
   }
 
   // account_manager (text) is always kept in sync with account_manager_id —
@@ -681,7 +805,7 @@ export async function updateTicketStatus(req: Request, res: Response) {
       });
     }
     return res.status(400).json({
-      error: "This ticket has a pending inventory item that hasn't been dispatched yet. Complete the outward workflow in Inventory before closing.",
+      error: "This ticket has a pending inward item that hasn't been dispatched yet. Complete the outward workflow in Inward/Outward before closing.",
     });
   }
 
@@ -696,7 +820,12 @@ export async function updateTicketStatus(req: Request, res: Response) {
     details: `New status: ${parsed.data.status}`,
   });
 
-  if (parsed.data.status === "Closed" && !ticket.closed_notified_at && ticket.email_id) {
+  if (
+    parsed.data.status === "Closed" &&
+    !ticket.closed_notified_at &&
+    ticket.email_id &&
+    ticket.call_type !== "Routine Checks"
+  ) {
     // Tickets dispatched through the inventory workflow already got a
     // "Repair Completed and Dispatched" email when the outward date was
     // set (see upsertInventory) — that serves as their closure notice, so

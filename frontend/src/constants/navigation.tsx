@@ -29,7 +29,8 @@ export const NAV_ADMIN = [
 
 // Shown to admins and Team Field only — see AppSidebar, which filters by
 // user.role/user.team. Team FMS has no access to inventory at all.
-export const NAV_INVENTORY = [{ title: "Inventory", url: "/inventory", icon: <ListChecksIcon /> }];
-
-export const NAV_SECONDARY = [
+export const NAV_INVENTORY = [
+  { title: "Inward/Outward", url: "/inventory", icon: <ListChecksIcon /> },
 ];
+
+export const NAV_SECONDARY = [];

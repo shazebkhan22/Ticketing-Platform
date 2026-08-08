@@ -17,6 +17,7 @@ import type { TicketStatus } from "@/types/ticket";
 import { STATUS_FLOW, isLegalStatusTransition } from "@/constants/ticket";
 import { ProjectStatusBadge } from "@/components/ProjectStatusBadge";
 import { InstallationReport } from "@/components/InstallationReport";
+import { Field } from "@/components/DetailCard";
 import {
   formatDate,
   formatDateTime,
@@ -36,17 +37,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-function Field({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div>
-      <div className="text-xs font-semibold tracking-wide text-neutral-500 uppercase">{label}</div>
-      <div className="mt-0.5 text-sm text-neutral-800 wrap-break-word whitespace-normal">
-        {value || "-"}
-      </div>
-    </div>
-  );
-}
 
 export function ProjectDetailPage() {
   const { srNo } = useParams<{ srNo: string }>();
