@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,7 +12,8 @@ import {
   useTicketDetail,
   useUpdateTicket,
 } from "@/hooks/useTickets";
-import type { CustomerDirectoryEntry, TicketDetail, TicketFormInput } from "@/types/ticket";
+import { useAddToInventory } from "@/hooks/useInventory";
+import type { CustomerDirectoryEntry, Ticket, TicketDetail, TicketFormInput } from "@/types/ticket";
 import { AccountManagerSelect } from "@/components/AccountManagerSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,16 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { todayLocalDate } from "@/lib/ticket-utils";
 import { ROUTINE_CHECK_TASKS } from "@/constants/ticket";
@@ -104,6 +115,13 @@ export function TicketFormPage() {
   const { data: ticketDetail, isLoading: ticketLoading } = useTicketDetail(ticketSrNo);
   const createTicketMutation = useCreateTicket();
   const updateTicketMutation = useUpdateTicket(ticketSrNo);
+  const addToInventoryMutation = useAddToInventory();
+
+  // Set right after creating a ticket that's assigned to Team Field — offers
+  // to add it to Inward/Outward immediately instead of making the creator
+  // go find it on the ticket detail page afterward. Declining just means
+  // "not now": it can still be added from the ticket detail page later.
+  const [inventoryPromptTicket, setInventoryPromptTicket] = useState<Ticket | null>(null);
 
   // Keyed by company name so selecting an existing company in the Combobox
   // below can auto-fill its last-known contact details instead of the user
@@ -182,7 +200,19 @@ export function TicketFormPage() {
       } else {
         const created = await createTicketMutation.mutateAsync(values as TicketFormInput);
         toast.success(`Ticket ${created.ticketNo} created`);
-        navigate(`/tickets/${created.srNo}`);
+        // Same audience/eligibility as canAddToInventory on the ticket
+        // detail page (admin or Team Field, never Routine Checks) — only
+        // prompt when the ticket is actually assigned to a Field engineer,
+        // since that's the audience this workflow is for.
+        const eligibleForInventoryPrompt =
+          values.callType !== "Routine Checks" &&
+          (isAdmin || user?.team === "Field") &&
+          created.assignees.some((a) => a.team === "Field");
+        if (eligibleForInventoryPrompt) {
+          setInventoryPromptTicket(created);
+        } else {
+          navigate(`/tickets/${created.srNo}`);
+        }
       }
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 409) {
@@ -194,6 +224,27 @@ export function TicketFormPage() {
         toast.error("Failed to save ticket. Check required fields.");
       }
     }
+  }
+
+  async function handleAddToInventory() {
+    if (!inventoryPromptTicket) return;
+    const srNo = inventoryPromptTicket.srNo;
+    try {
+      await addToInventoryMutation.mutateAsync(srNo);
+      toast.success("Added to Inward/Outward");
+    } catch {
+      toast.error("Failed to add to Inward/Outward — you can still add it from the ticket page");
+    } finally {
+      setInventoryPromptTicket(null);
+      navigate(`/tickets/${srNo}`);
+    }
+  }
+
+  function handleSkipInventoryPrompt() {
+    if (!inventoryPromptTicket) return;
+    const srNo = inventoryPromptTicket.srNo;
+    setInventoryPromptTicket(null);
+    navigate(`/tickets/${srNo}`);
   }
 
   if (optionsLoading || !options || (isEdit && ticketLoading)) {
@@ -678,6 +729,30 @@ export function TicketFormPage() {
           </div>
         </form>
       </Form>
+
+      <AlertDialog
+        open={inventoryPromptTicket !== null}
+        onOpenChange={(open) => !open && handleSkipInventoryPrompt()}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Add this ticket to Inward/Outward?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ticket {inventoryPromptTicket?.ticketNo} is assigned to Team Field. You can add it to
+              Inward/Outward now, or do it later from the ticket detail page.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleSkipInventoryPrompt}>Not now</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleAddToInventory}
+              disabled={addToInventoryMutation.isPending}
+            >
+              {addToInventoryMutation.isPending ? "Adding..." : "Add to Inward/Outward"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
