@@ -159,7 +159,7 @@ export function ProjectsDashboardPage() {
 
   return (
     <div>
-      <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-2">
+      <div className="no-print mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-bold text-neutral-800">Projects</h2>
         {isAdmin && (
           <div className="flex flex-wrap gap-2">
@@ -357,6 +357,25 @@ export function ProjectsDashboardPage() {
               </Select>
             </div>
           )}
+          <div className="min-w-24 flex-1">
+            <label className="mb-1 block text-xs font-semibold text-neutral-500">Assigned By</label>
+            <Select
+              value={filters.assignedBy ?? ALL_FILTER_VALUE}
+              onValueChange={updateSelectFilter("assignedBy")}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_FILTER_VALUE}>All</SelectItem>
+                {options?.assignedBys.map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {a}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="min-w-20 flex-1">
             <label className="mb-1 block text-xs font-semibold text-neutral-500">Team</label>
             <Select
